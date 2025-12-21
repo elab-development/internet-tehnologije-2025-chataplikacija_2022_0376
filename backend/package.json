@@ -4,7 +4,15 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon --exec ts-node src/server.ts",
+  
+      "build": "tsc",
+  
+      "start": "node dist/server.js",
+  
+      "migration:generate": "typeorm-ts-node-commonjs migration:generate",
+  
+      "migration:run": "typeorm-ts-node-commonjs migration:run"
   },
   "keywords": [],
   "author": "",
@@ -34,4 +42,5 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
+  
 }
