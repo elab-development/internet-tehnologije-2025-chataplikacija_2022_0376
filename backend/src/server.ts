@@ -12,7 +12,7 @@ import { AppDataSource } from './config/database';
 
 import { initializeSocketServer } from './socket/socketServer';
 
- 
+ import userRoutes from './routes/userRoutes';
 
 // Routes
 
@@ -57,6 +57,8 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 
 app.use('/api/auth', authRoutes);
+
+app.use('/api/users', userRoutes); 
 
 app.use('/api/chats', chatRoutes);
 
