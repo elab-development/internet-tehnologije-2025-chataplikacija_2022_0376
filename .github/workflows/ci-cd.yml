@@ -76,7 +76,7 @@ jobs:
 
         with:
 
-          node-version: '18'
+          node-version: '20'
 
          
 

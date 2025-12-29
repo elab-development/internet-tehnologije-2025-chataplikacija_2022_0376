@@ -76,9 +76,9 @@ export const authenticate = async (
 
         user.status = UserStatus.ACTIVE;
 
-        user.suspendedUntil = null;
+        user.suspendedUntil = undefined;
 
-        user.suspensionReason = null;
+        user.suspensionReason = undefined;
 
         await userRepository.save(user);
 
