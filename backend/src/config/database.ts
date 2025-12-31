@@ -11,7 +11,7 @@ export const AppDataSource = new DataSource({
     synchronize: true,
     logging: true,
     // Ovako ce TypeORM sam naci entitete u dist folderu bez importa
-    entities: [path.join(__dirname, "..", "entity", "**", "*.js")],
+    entities: [path.join(__dirname, "..", "entities", "**", "*.js")],
     migrations: [],
     subscribers: [],
 });
