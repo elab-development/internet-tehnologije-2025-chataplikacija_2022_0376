@@ -111,7 +111,7 @@ export const login = async (req: Request, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
     try {
-        const userId = (req as any).user.userId; // pretpostavka da middleware ovde stavlja podatke
+        const userId = (req as any).user.userId; 
         const userRepository = AppDataSource.getRepository(User);
 
         await userRepository.update(userId, {
@@ -144,3 +144,4 @@ export const changePassword = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
