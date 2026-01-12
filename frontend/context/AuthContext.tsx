@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '../lib/axios';
-import { User, AuthResponse, LoginCredentials, RegisterData } from '../types';
+import { User, AuthResponse, LoginCredentials, RegisterData } from '../types/types';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {

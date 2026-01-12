@@ -54,6 +54,11 @@ export class User {
 
   @Column({ nullable: true })
   suspendedUntil?: Date;
+  @Column({ nullable: true })
+  resetPasswordToken?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  resetPasswordExpires?: Date;
 
   @Column({ nullable: true })
   suspensionReason?: string;

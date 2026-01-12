@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Check, CheckCheck, MoreVertical, Pencil, Trash2, AlertCircle } from 'lucide-react';
-import { Message, User } from '../../types';
+import { Message, User } from '../../types/types';
 import Avatar from '../../components/ui/Avatar';
 import { formatMessageTime } from '../../lib/utils';
 import { cn } from '../../lib/utils';

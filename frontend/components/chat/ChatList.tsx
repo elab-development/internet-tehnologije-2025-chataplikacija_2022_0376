@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Users, MessageCircle } from 'lucide-react';
 import axios from '../../lib/axios';
-import { Conversation } from '../../types';
+import { Conversation } from '../../types/types';
 import Avatar from '../../components/ui/Avatar';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
@@ -31,10 +31,10 @@ export default function ChatList({
 
   const fetchConversations = async () => {
     try {
-      const response = await axios.get('/conversations');
+      const response = await axios.get('/chats');
       setConversations(response.data);
     } catch (error) {
-      console.error('Error fetching conversations:', error);
+      console.error('Error fetching chats:', error);
     } finally {
       setLoading(false);
     }

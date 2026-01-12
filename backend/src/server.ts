@@ -44,25 +44,22 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 1. PRVO pokrećemo HTTP server da kontejner ostane živ
 httpServer.listen(PORT, () => {
   console.log(`--- SERVER IS RUNNING ON PORT ${PORT} ---`);
   console.log(`--- HEALTH CHECK: http://localhost:${PORT}/health ---`);
 });
 
-// 2. ONDA inicijalizujemo bazu u pozadini
+
 AppDataSource.initialize()
   .then(() => {
     console.log('--- DATABASE CONNECTED SUCCESSFULLY ---');
     
-    // Initialize Socket.IO nakon što je baza spremna (opciono, može i ranije)
     initializeSocketServer(httpServer);
     console.log('--- WEBSOCKET SERVER INITIALIZED ---');
   })
   .catch((error) => {
     console.error('!!! DATABASE CONNECTION FAILED !!!');
     console.error(error);
-    // Ne gasimo proces (process.exit), da bismo mogli da vidimo logove
   });
 
 export default app;

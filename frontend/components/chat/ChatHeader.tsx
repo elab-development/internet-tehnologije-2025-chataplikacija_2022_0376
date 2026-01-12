@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Phone, Video, MoreVertical, ArrowLeft, Users } from 'lucide-react';
-import { Conversation, User } from '../../types';
+import { Conversation, User } from '../../types/types';
 import Avatar from '../../components/ui/Avatar';
 import Button from '../../components/ui/Button';
 

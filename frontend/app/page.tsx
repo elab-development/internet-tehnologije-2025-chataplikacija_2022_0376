@@ -18,7 +18,6 @@ export default function Home() {
       }
     }
   }, [user, loading, router]);
-
   return (
     <div className="h-screen flex items-center justify-center bg-dark-50">
       <Loader2 className="animate-spin text-primary-600" size={48} />

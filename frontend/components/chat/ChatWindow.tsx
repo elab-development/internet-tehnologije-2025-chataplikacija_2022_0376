@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Message, Conversation, User } from '../../types';
+import { Message, Conversation, User } from '../../types/types';
 import axios from '../../lib/axios';
 import { useSocket } from '../../context/SocketContext';
 import ChatHeader from './ChatHeader';
@@ -64,8 +64,8 @@ export default function ChatWindow({
     try {
       setLoading(true);
       const [convResponse, messagesResponse] = await Promise.all([
-        axios.get(`/conversations/${conversationId}`),
-        axios.get(`/conversations/${conversationId}/messages`),
+        axios.get(`/chats/${conversationId}`),
+        axios.get(`/chats/${conversationId}/messages`),
       ]);
       
       setConversation(convResponse.data);
@@ -273,4 +273,4 @@ export default function ChatWindow({
       </Modal>
     </div>
   );
-}
+} 

@@ -397,7 +397,7 @@ export default function ProfilePage() {
         </div>
       </Modal>
 
-      {/* Delete Account Confirmation Modal */}
+      {/* Delete Account Confirmation */}
       <Modal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}

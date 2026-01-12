@@ -23,7 +23,6 @@ export default function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Set message when editing
   React.useEffect(() => {
     if (editingMessage) {
       setMessage(editingMessage.content);
@@ -40,7 +39,6 @@ export default function MessageInput({
     setMessage('');
     setSelectedFile(null);
     
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -63,14 +61,13 @@ export default function MessageInput({
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
     
-    // Auto-resize textarea
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
 
   return (
     <div className="border-t border-dark-200 bg-white p-4">
-      {/* Editing Indicator */}
+      {}
       {editingMessage && (
         <div className="mb-2 flex items-center justify-between bg-primary-50 px-3 py-2 rounded-lg">
           <span className="text-sm text-primary-700">
@@ -85,7 +82,7 @@ export default function MessageInput({
         </div>
       )}
 
-      {/* Selected File */}
+      {}
       {selectedFile && (
         <div className="mb-2 flex items-center justify-between bg-dark-50 px-3 py-2 rounded-lg">
           <div className="flex items-center gap-2">
@@ -105,9 +102,9 @@ export default function MessageInput({
         </div>
       )}
 
-      {/* Input Form */}
+      
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
-        {/* File Upload */}
+        {}
         <input
           ref={fileInputRef}
           type="file"
@@ -127,7 +124,7 @@ export default function MessageInput({
           <Paperclip size={20} />
         </Button>
 
-        {/* Text Input */}
+        {/* Text  */}
         <div className="flex-1 relative">
           <textarea
             ref={textareaRef}
@@ -145,7 +142,7 @@ export default function MessageInput({
             )}
           />
           
-          {/* Emoji Button */}
+          {/* Emoji  */}
           <button
             type="button"
             className="absolute right-3 bottom-3 text-dark-400 hover:text-dark-600"

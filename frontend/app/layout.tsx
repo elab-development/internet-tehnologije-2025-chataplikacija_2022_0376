@@ -20,9 +20,10 @@ export default function RootLayout({
   return (
     <html lang="sr">
       <body className={inter.className}>
-        {/* Prvo ide Auth, pa Socket jer socket verovatno zavisi od auth-a */}
+        {}
         <AuthProvider>
           <SocketProvider>
+            
             {children}
             <Toaster
               position="top-right"

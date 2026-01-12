@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Conversation, Message } from 'types';
+import { Conversation, Message } from 'types/types';
 import axios from 'lib/axios';
 import { useSocket } from 'hooks/useSocket';
 import toast from 'react-hot-toast';

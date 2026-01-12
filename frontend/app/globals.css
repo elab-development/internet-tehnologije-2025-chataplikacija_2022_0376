@@ -4,13 +4,13 @@
 
 :root {
   /* WhatsApp paleta boja */
-  --wa-bg-main: #efeae2;          /* Pozadina za čet (bež) */
-  --wa-bg-sidebar: #ffffff;       /* Pozadina za listu kontakata */
-  --wa-header: #f0f2f5;           /* Svetlo siva za zaglavlja */
-  --wa-green: #00a884;            /* WhatsApp zelena */
+  --wa-bg-main: #efeae2;          
+  --wa-bg-sidebar: #ffffff;       
+  --wa-header: #f0f2f5;           
+  --wa-green: #00a884;            
   --wa-green-dark: #008069;
-  --wa-message-out: #d9fdd3;      /* Boja tvoje poruke */
-  --wa-message-in: #ffffff;       /* Boja tuđe poruke */
+  --wa-message-out: #d9fdd3;      
+  --wa-message-in: #ffffff;       
   --wa-text-main: #111b21;
   --wa-text-secondary: #667781;
 }
@@ -23,7 +23,6 @@ body {
   padding: 0;
 }
 
-/* Stilovi za balone poruka (Message Bubbles) */
 .message-bubble {
   max-width: 65%;
   padding: 8px 12px;
@@ -46,7 +45,6 @@ body {
   border-top-left-radius: 0;
 }
 
-/* Custom Scrollbar - baš kao na WhatsApp Web-u */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -59,7 +57,6 @@ body {
   background: transparent;
 }
 
-/* Stil za Sidebar listu (ChatList) */
 .chat-item:hover {
   background-color: #f5f6f6;
   cursor: pointer;
@@ -69,7 +66,6 @@ body {
   background-color: #ebebeb;
 }
 
-/* Zeleni krugovi za statuse/dugmiće */
 .wa-button-green {
   background-color: var(--wa-green);
   color: white;
@@ -78,4 +74,20 @@ body {
 
 .wa-button-green:hover {
   background-color: var(--wa-green-dark);
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #d1d5db;
+  }
 }

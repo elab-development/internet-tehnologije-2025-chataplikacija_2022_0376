@@ -1,5 +1,6 @@
 'use client';
 
+import '../globals.css'; 
 import React, { useState } from 'react';
 import { useAuth } from 'context/AuthContext';
 import ChatList from 'components/chat/ChatList';
@@ -19,7 +20,6 @@ export default function ChatPage() {
   };
 
   if (!user) return null;
-
   return (
     <div className="flex h-full w-full bg-white">
       {/* SIDEBAR - Levi deo */}

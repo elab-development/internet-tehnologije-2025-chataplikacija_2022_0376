@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'lib/axios';
-import { Report } from 'types';
+import { Report } from 'types/types';
 import Card from 'components/ui/Card';
 import Button from 'components/ui/Button';
 import Modal from 'components/ui/Modal';
