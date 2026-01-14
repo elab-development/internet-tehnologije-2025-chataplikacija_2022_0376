@@ -1,65 +1,53 @@
 import 'reflect-metadata';
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { createServer } from 'http';
-import { AppDataSource } from './config/database';
-import { initializeSocketServer } from './socket/socketServer';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import app from './app';
+import { initializeDatabase } from './config/database';
+import { socketConfig } from './config/socket';
+import { initializeSocketHandlers } from './socket';
+import { config } from 'dotenv';
 
-// Routes
-import userRoutes from './routes/userRoutes';
-import authRoutes from './routes/authRoutes';
-import chatRoutes from './routes/chatRoutes';
-import messageRoutes from './routes/messageRoutes';
-import reportRoutes from './routes/reportRoutes';
+config();
 
-dotenv.config();
-
-const app = express();
-const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-}));
+// Create HTTP server
+const server = http.createServer(app);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Initialize Socket.IO
+const io = new SocketIOServer(server, socketConfig);
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes); 
-app.use('/api/chats', chatRoutes);
-app.use('/api/messages', messageRoutes);
-app.use('/api/reports', reportRoutes);
+// Setup socket handlers
+initializeSocketHandlers(io);
 
-// Health check ruta - služi da proveriš da li server radi
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    database: AppDataSource.isInitialized ? 'Connected' : 'Disconnected'
+// Export io for use in controllers
+export { io };
+
+// Start server
+const startServer = async () => {
+  try {
+    // Initialize database
+    await initializeDatabase();
+
+    // Start HTTP server
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📡 WebSocket server running on port ${PORT}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('⚠️  SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+    process.exit(0);
   });
 });
-
-httpServer.listen(PORT, () => {
-  console.log(`--- SERVER IS RUNNING ON PORT ${PORT} ---`);
-  console.log(`--- HEALTH CHECK: http://localhost:${PORT}/health ---`);
-});
-
-
-AppDataSource.initialize()
-  .then(() => {
-    console.log('--- DATABASE CONNECTED SUCCESSFULLY ---');
-    
-    initializeSocketServer(httpServer);
-    console.log('--- WEBSOCKET SERVER INITIALIZED ---');
-  })
-  .catch((error) => {
-    console.error('!!! DATABASE CONNECTION FAILED !!!');
-    console.error(error);
-  });
-
-export default app;

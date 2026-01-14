@@ -102,7 +102,7 @@ export const initializeSocketServer = (httpServer: HTTPServer) => {
 
       if (user) {
         user.isOnline = false;
-        user.lastSeen = new Date();
+        user.lastSeenAt = new Date();
         await userRepository.save(user);
       }
     });

@@ -1,17 +1,35 @@
-import { DataSource } from "typeorm";
-import path from "path";
+import { DataSource } from 'typeorm';
+import { config } from 'dotenv';
+import path from 'path';
+
+config();
 
 export const AppDataSource = new DataSource({
-    type: "postgres",
-    host: "postgres", // Ime servisa iz docker-compose
-    port: 5432,
-    username: "postgres",
-    password: "postgres",
-    database: "chat_db",
-    synchronize: true,
-    logging: true,
-    // Ovako ce TypeORM sam naci entitete u dist folderu bez importa
-    entities: [path.join(__dirname, "..", "entities", "**", "*.js")],
-    migrations: [],
-    subscribers: [],
+  type: 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  username: process.env.DB_USERNAME || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+  database: process.env.DB_DATABASE || 'chat_app',
+  synchronize: false, // Use migrations instead
+  logging: process.env.NODE_ENV === 'development',
+  entities: [path.join(__dirname, '../entities/**/*.{ts,js}')],
+  migrations: [path.join(__dirname, '../migrations/**/*.{ts,js}')],
+  subscribers: [],
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
+
+export const initializeDatabase = async () => {
+  try {
+    await AppDataSource.initialize();
+    console.log('✅ Database connected successfully');
+    
+    if (process.env.NODE_ENV === 'development') {
+      await AppDataSource.runMigrations();
+      console.log('✅ Migrations executed successfully');
+    }
+  } catch (error) {
+    console.error('❌ Error connecting to database:', error);
+    process.exit(1);
+  }
+};

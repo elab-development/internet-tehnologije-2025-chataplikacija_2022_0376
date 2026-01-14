@@ -5,9 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToMany,
 } from 'typeorm';
 import { Message } from './Message';
-import { ChatMembership } from './ChatMembership';
+import { MessageReport } from './MessageReport';
+import { ConversationParticipant } from './ConversationParticipant';
+import { Conversation } from './Conversation';
 
 export enum UserRole {
   USER = 'user',
@@ -15,13 +18,7 @@ export enum UserRole {
   ADMIN = 'admin',
 }
 
-export enum UserStatus {
-  ACTIVE = 'active',
-  SUSPENDED = 'suspended',
-  BANNED = 'banned',
-}
-
-@Entity('users')
+@Entity({ name: 'users' })
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -33,10 +30,7 @@ export class User {
   password!: string;
 
   @Column()
-  firstName!: string;
-
-  @Column()
-  lastName!: string;
+  username!: string;
 
   @Column({
     type: 'enum',
@@ -45,42 +39,72 @@ export class User {
   })
   role!: UserRole;
 
-  @Column({
-    type: 'enum',
-    enum: UserStatus,
-    default: UserStatus.ACTIVE,
-  })
-  status!: UserStatus;
+  @Column({ type: 'boolean', default: false })
+  isSuspended!: boolean;
 
-  @Column({ nullable: true })
-  suspendedUntil?: Date;
-  @Column({ nullable: true })
-  resetPasswordToken?: string;
+  @Column({ type: 'timestamptz', nullable: true })
+  suspensionEndDate!: Date | null;
 
-  @Column({ type: 'timestamp', nullable: true })
-  resetPasswordExpires?: Date;
+  @Column({ type: 'text', nullable: true })
+  suspensionReason!: string | null;
 
-  @Column({ nullable: true })
-  suspensionReason?: string;
+  @Column({ type: 'text', nullable: true })
+  avatarUrl!: string | null;
 
-  @Column({ default: false })
+  @Column({ type: 'boolean', default: true })
   isOnline!: boolean;
 
-  @Column({ nullable: true })
-  lastSeen?: Date;
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSeenAt!: Date | null;
 
-  @Column({ nullable: true })
-  profilePicture?: string;
-
-  @OneToMany(() => Message, (message) => message.sender)
-  sentMessages!: Message[];
-
-  @OneToMany(() => ChatMembership, (membership) => membership.user)
-  chatMemberships!: ChatMembership[];
-
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
+
+  // ================= RELATIONS =================
+
+  @OneToMany(
+    () => Message,
+    (message: Message) => message.sender
+  )
+  messages!: Message[];
+
+  @OneToMany(
+    () => MessageReport,
+    (report: MessageReport) => report.reporter
+  )
+  reportsMade!: MessageReport[];
+
+  @OneToMany(
+    () => MessageReport,
+    (report: MessageReport) => report.reviewer
+  )
+  reportsReviewed!: MessageReport[];
+
+  @OneToMany(
+    () => ConversationParticipant,
+    (participant: ConversationParticipant) => participant.user
+  )
+  participations!: ConversationParticipant[];
+
+  @ManyToMany(
+    () => Conversation,
+    (conversation: Conversation) => conversation.moderators
+  )
+  moderatedConversations!: Conversation[];
+
+  // ================= HELPERS =================
+
+  get isActivelySuspended(): boolean {
+    if (!this.isSuspended) return false;
+    if (!this.suspensionEndDate) return true;
+    return new Date() < this.suspensionEndDate;
+  }
+
+  toJSON() {
+    const { password, ...user } = this;
+    return user;
+  }
 }

@@ -9,33 +9,23 @@ import {
   OneToMany,
 } from 'typeorm';
 import { User } from './User';
-import { Chat } from './Chat';
+import { Conversation } from './Conversation';
 import { MessageReport } from './MessageReport';
 
 export enum MessageType {
   TEXT = 'text',
   FILE = 'file',
-  GIF = 'gif',
+  IMAGE = 'image',
+  VIDEO = 'video',
 }
 
-@Entity('messages')
+@Entity({ name: 'messages' })
 export class Message {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @ManyToOne(() => User, (user) => user.sentMessages)
-  @JoinColumn({ name: 'senderId' })
-  sender!: User;
-
-  @Column()
-  senderId!: string;
-
-  @ManyToOne(() => Chat, (chat) => chat.messages)
-  @JoinColumn({ name: 'chatId' })
-  chat!: Chat;
-
-  @Column()
-  chatId!: string;
+  @Column({ type: 'text' })
+  content!: string;
 
   @Column({
     type: 'enum',
@@ -44,27 +34,60 @@ export class Message {
   })
   type!: MessageType;
 
-  @Column('text')
-  content!: string;
+  @Column({ type: 'text', nullable: true })
+  fileUrl!: string | null;
 
-  @Column({ nullable: true })
-  fileUrl?: string;
+  @Column({ type: 'text', nullable: true })
+  fileName!: string | null;
 
-  @Column({ nullable: true })
-  fileName?: string;
+  @Column({ type: 'bigint', nullable: true })
+  fileSize!: number | null;
 
-  @Column({ default: false })
+  @Column({ type: 'boolean', default: false })
   isEdited!: boolean;
 
-  @Column({ default: false })
+  @Column({ type: 'boolean', default: false })
   isDeleted!: boolean;
 
-  @OneToMany(() => MessageReport, (report) => report.message)
-  reports!: MessageReport[];
+  @Column({ type: 'boolean', default: false })
+  isPinned!: boolean;
 
-  @CreateDateColumn()
+  @Column({ type: 'uuid' })
+  senderId!: string;
+
+  @Column({ type: 'uuid' })
+  conversationId!: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  editedAt!: Date | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
+
+  // ================= RELATIONS =================
+
+  @ManyToOne(
+    () => User,
+    (user: User) => user.messages,
+    { onDelete: 'CASCADE' }
+  )
+  @JoinColumn({ name: 'senderId' })
+  sender!: User;
+
+  @ManyToOne(
+    () => Conversation,
+    (conversation: Conversation) => conversation.messages,
+    { onDelete: 'CASCADE' }
+  )
+  @JoinColumn({ name: 'conversationId' })
+  conversation!: Conversation;
+
+  @OneToMany(
+    () => MessageReport,
+    (report: MessageReport) => report.message
+  )
+  reports!: MessageReport[];
 }
