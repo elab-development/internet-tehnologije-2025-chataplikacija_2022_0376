@@ -1,43 +1,19 @@
 import { Router } from 'express';
-
 import {
-
   sendMessage,
-
-  getChatMessages,
-
   editMessage,
-
   deleteMessage,
-
   searchMessages,
-
 } from '../controllers/messageController';
-
 import { authenticate } from '../middleware/auth';
-
-import { validateMessage, handleValidationErrors } from '../utils/validation';
-
- 
 
 const router = Router();
 
- 
-
 router.use(authenticate);
 
- 
-
-router.post('/', validateMessage, handleValidationErrors, sendMessage);
-
-router.get('/chat/:chatId', getChatMessages);
-
-router.put('/:messageId', editMessage);
-
-router.delete('/:messageId', deleteMessage);
-
-router.get('/search', searchMessages);
-
- 
+router.post('/', sendMessage);                    // POST /api/messages
+router.put('/:messageId', editMessage);           // PUT /api/messages/:messageId
+router.delete('/:messageId', deleteMessage);      // DELETE /api/messages/:messageId
+router.get('/search', searchMessages);            // GET /api/messages/search
 
 export default router;

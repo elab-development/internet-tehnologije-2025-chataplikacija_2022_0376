@@ -5,15 +5,18 @@ import { Chat, ChatType } from '../entities/Chat';
 import { ChatMembership, MemberRole } from '../entities/ChatMembership';
 import { User } from '../entities/User';
 
-// Pomoćna funkcija za formatiranje četa
+
+// Pomoćna fja za formatiranje četa 
 const formatChatResponse = (chat: any) => {
   if (!chat) return null;
   return {
     ...chat,
-    // Izvlačimo korisnike iz memberships niza i stavljamo ih u participants
-    participants: chat.memberships ? chat.memberships.map((m: any) => m.user) : []
+    participants: chat.memberships ? chat.memberships.map((m: any) => m.user) : [],
+    messages: chat.messages || []
   };
 };
+
+
 
 export const createPrivateChat = async (req: AuthRequest, res: Response) => {
   try {
@@ -43,13 +46,15 @@ export const createPrivateChat = async (req: AuthRequest, res: Response) => {
     if (existingChatId) {
       const existingChat = await chatRepository.findOne({
         where: { id: existingChatId },
-        relations: ['memberships', 'memberships.user'],
+        relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
       });
       return res.json(formatChatResponse(existingChat));
     }
 
     // 2. Kreiranje novog privatnog četa
-    const chat = chatRepository.create({ type: ChatType.PRIVATE });
+    const chat = chatRepository.create({ 
+        type: ChatType.PRIVATE 
+    });
     await chatRepository.save(chat);
 
     const membership1 = membershipRepository.create({
@@ -68,13 +73,13 @@ export const createPrivateChat = async (req: AuthRequest, res: Response) => {
 
     const createdChat = await chatRepository.findOne({
       where: { id: chat.id },
-      relations: ['memberships', 'memberships.user'],
+      relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
     });
 
-    res.status(201).json(formatChatResponse(createdChat));
+    return res.status(201).json(formatChatResponse(createdChat));
   } catch (error) {
     console.error('Create private chat error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -92,13 +97,15 @@ export const createGroupChat = async (req: AuthRequest, res: Response) => {
     });
     await chatRepository.save(chat);
 
+    // (onaj ko kreira)
     const adminMembership = membershipRepository.create({
       chatId: chat.id,
       userId: currentUserId,
       role: MemberRole.ADMIN,
     });
 
-    const memberships = participantIds.map((userId: string) =>
+    // Ostali članovi
+    const otherMemberships = participantIds.map((userId: string) =>
       membershipRepository.create({
         chatId: chat.id,
         userId,
@@ -106,17 +113,17 @@ export const createGroupChat = async (req: AuthRequest, res: Response) => {
       })
     );
 
-    await membershipRepository.save([adminMembership, ...memberships]);
+    await membershipRepository.save([adminMembership, ...otherMemberships]);
 
     const createdChat = await chatRepository.findOne({
       where: { id: chat.id },
-      relations: ['memberships', 'memberships.user'],
+      relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
     });
 
-    res.status(201).json(formatChatResponse(createdChat));
+    return res.status(201).json(formatChatResponse(createdChat));
   } catch (error) {
     console.error('Create group chat error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -127,23 +134,21 @@ export const getUserChats = async (req: AuthRequest, res: Response) => {
 
     const memberships = await membershipRepository.find({
       where: { userId },
-      relations: ['chat', 'chat.memberships', 'chat.memberships.user', 'chat.messages'],
+      relations: ['chat', 'chat.memberships', 'chat.memberships.user', 'chat.messages', 'chat.messages.sender'],
       order: { chat: { updatedAt: 'DESC' } },
     });
 
-    // Formatiramo svaki chat u listi, ali pazimo da ne mapiramo null chatove
     const chats = memberships
       .filter(m => m.chat)
       .map((m) => formatChatResponse(m.chat));
 
-    res.json(chats);
+    return res.json(chats);
   } catch (error) {
     console.error('Get user chats error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
-// DODATA FUNKCIJA KOJA JE FALILA (Ovo popravlja 404 grešku)
 export const getChatById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -158,10 +163,10 @@ export const getChatById = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: 'Chat nije pronađen' });
     }
 
-    res.json(formatChatResponse(chat));
+    return res.json(formatChatResponse(chat));
   } catch (error) {
     console.error('Get chat by ID error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -184,9 +189,9 @@ export const removeMemberFromGroup = async (req: AuthRequest, res: Response) => 
     }
 
     await membershipRepository.delete({ chatId, userId });
-    res.json({ message: 'Member removed successfully' });
+    return res.json({ message: 'Member removed successfully' });
   } catch (error) {
     console.error('Remove member error:', error);
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Server error' });
   }
 };

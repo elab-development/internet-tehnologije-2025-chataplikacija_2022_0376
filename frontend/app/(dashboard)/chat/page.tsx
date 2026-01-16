@@ -7,6 +7,7 @@ import ChatWindow from 'components/chat/ChatWindow';
 import NewChatModal from 'components/chat/NewChatModal';
 import { MessageSquare } from 'lucide-react';
 
+
 export default function ChatPage() {
   const { user } = useAuth();
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();

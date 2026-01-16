@@ -14,68 +14,59 @@ export function useChat(conversationId?: string) {
   const [sending, setSending] = useState(false);
   const { socket } = useSocket();
 
-  // Fetch all conversations
+  // 1. Učitavanje svih konverzacija (Backend ruta: GET /api/chats)
   const fetchConversations = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/conversations');
+      const response = await axios.get('/chats');
       setConversations(response.data);
     } catch (error) {
-      console.error('Error fetching conversations:', error);
-      toast.error('Greška pri učitavanju konverzacija');
+      console.error('Greška pri učitavanju lista ćaskanja:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Fetch specific conversation
+  // 2. Učitavanje detalja (Backend ruta: GET /api/chats/:id)
   const fetchConversation = useCallback(async (id: string) => {
     try {
-      const response = await axios.get(`/conversations/${id}`);
+      const response = await axios.get(`/chats/${id}`);
       setCurrentConversation(response.data);
     } catch (error) {
-      console.error('Error fetching conversation:', error);
-      toast.error('Greška pri učitavanju konverzacije');
+      console.error('Konverzacija nije pronađena:', error);
+      toast.error('Nije moguće učitati detalje četa');
     }
   }, []);
 
-  // Fetch messages for conversation
+  // 3. ISPRAVLJENO: Učitavanje poruka (Backend ruta: GET /api/messages/chat/:chatId)
   const fetchMessages = useCallback(async (id: string) => {
     try {
       setLoading(true);
-      const response = await axios.get(`/conversations/${id}/messages`);
+      const response = await axios.get(`/messages/chat/${id}`); // Promenjena putanja
       setMessages(response.data);
     } catch (error) {
-      console.error('Error fetching messages:', error);
-      toast.error('Greška pri učitavanju poruka');
+      console.error('Greška pri učitavanju poruka:', error);
+      setMessages([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Send message
-  const sendMessage = useCallback(async (
-    content: string,
-    conversationId: string,
-    file?: File
-  ) => {
+  // 4. ISPRAVLJENO: Slanje poruke (Usklađeno sa backend sendMessage)
+  const sendMessage = useCallback(async (content: string, targetId: string, file?: File) => {
     try {
       setSending(true);
-      const formData = new FormData();
-      formData.append('content', content);
-      formData.append('conversationId', conversationId);
       
-      if (file) {
-        formData.append('file', file);
-      }
-
-      const response = await axios.post('/messages', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      // Ako tvoj backend koristi običan JSON umesto FormDate (proveri messageController)
+      // Koristimo JSON jer je lakše ako nemaš pravi file upload setup spreman
+      const response = await axios.post('/messages', {
+        content,
+        chatId: targetId, // Backend očekuje chatId
+        type: file ? 'file' : 'text'
       });
 
       return response.data;
     } catch (error) {
-      console.error('Error sending message:', error);
       toast.error('Greška pri slanju poruke');
       throw error;
     } finally {
@@ -83,123 +74,44 @@ export function useChat(conversationId?: string) {
     }
   }, []);
 
-  // Update message
-  const updateMessage = useCallback(async (messageId: string, content: string) => {
+  // 5. ISPRAVLJENO: Kreiranje konverzacije (Backend rute: /chats/private i /chats/group)
+  const createConversation = useCallback(async (type: 'private' | 'group', participantIds: string[], name?: string) => {
     try {
-      const response = await axios.put(`/messages/${messageId}`, { content });
-      toast.success('Poruka izmenjena');
+      const url = type === 'private' ? '/chats/private' : '/chats/group';
+      const payload = type === 'private' 
+        ? { participantId: participantIds[0] } 
+        : { name, participantIds };
+
+      const response = await axios.post(url, payload);
+      toast.success('Konverzacija pokrenuta');
+      await fetchConversations(); 
       return response.data;
     } catch (error) {
-      console.error('Error updating message:', error);
-      toast.error('Greška pri izmeni poruke');
-      throw error;
-    }
-  }, []);
-
-  // Delete message
-  const deleteMessage = useCallback(async (messageId: string) => {
-    try {
-      await axios.delete(`/messages/${messageId}`);
-      toast.success('Poruka obrisana');
-    } catch (error) {
-      console.error('Error deleting message:', error);
-      toast.error('Greška pri brisanju poruke');
-      throw error;
-    }
-  }, []);
-
-  // Create conversation
-  const createConversation = useCallback(async (
-    type: 'private' | 'group',
-    participantIds: string[],
-    name?: string
-  ) => {
-    try {
-      const response = await axios.post('/conversations', {
-        type,
-        participantIds,
-        name,
-      });
-      toast.success('Konverzacija kreirana');
-      return response.data;
-    } catch (error) {
-      console.error('Error creating conversation:', error);
       toast.error('Greška pri kreiranju konverzacije');
       throw error;
     }
-  }, []);
+  }, [fetchConversations]);
 
-  // Report message
-  const reportMessage = useCallback(async (
-    messageId: string,
-    reason: string,
-    comment?: string
-  ) => {
-    try {
-      await axios.post('/reports', {
-        messageId,
-        reason,
-        comment,
-      });
-      toast.success('Poruka prijavljena');
-    } catch (error) {
-      console.error('Error reporting message:', error);
-      toast.error('Greška pri prijavljivanju poruke');
-      throw error;
-    }
-  }, []);
-
-  // Socket listeners
+  // Socket listenery - Proveri da li se eventi zovu 'new_message' ili 'message:new'
   useEffect(() => {
     if (!socket) return;
 
     const handleNewMessage = (message: Message) => {
-      setMessages((prev) => [...prev, message]);
-      
-      // Update conversation's last message
-      setConversations((prev) =>
-        prev.map((conv) =>
-          conv.id === message.conversationId
-            ? { ...conv, lastMessage: message, updatedAt: message.createdAt }
-            : conv
-        )
-      );
-    };
-
-    const handleMessageUpdated = (message: Message) => {
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === message.id ? message : msg))
-      );
-    };
-
-    const handleMessageDeleted = (messageId: string) => {
-      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-    };
-
-    const handleConversationUpdated = (conversation: Conversation) => {
-      setConversations((prev) =>
-        prev.map((conv) => (conv.id === conversation.id ? conversation : conv))
-      );
-      
-      if (currentConversation?.id === conversation.id) {
-        setCurrentConversation(conversation);
+      // Backend šalje 'chatId', a tvoj tip možda ima 'conversationId'
+      if (message.conversationId === conversationId) {
+        setMessages((prev) => [...prev, message]);
       }
+
+      setConversations((prev) =>
+        prev.map((c) => (c.id === message.conversationId ? { ...c, updatedAt: new Date().toISOString() } : c))
+      );
+
     };
 
-    socket.on('message:new', handleNewMessage);
-    socket.on('message:updated', handleMessageUpdated);
-    socket.on('message:deleted', handleMessageDeleted);
-    socket.on('conversation:updated', handleConversationUpdated);
+    socket.on('new_message', handleNewMessage); // Usklađeno sa tvojim socket serverom
+    return () => { socket.off('new_message'); };
+  }, [socket, conversationId]);
 
-    return () => {
-      socket.off('message:new', handleNewMessage);
-      socket.off('message:updated', handleMessageUpdated);
-      socket.off('message:deleted', handleMessageDeleted);
-      socket.off('conversation:updated', handleConversationUpdated);
-    };
-  }, [socket, currentConversation]);
-
-  // Fetch data on mount or when conversationId changes
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
@@ -217,13 +129,8 @@ export function useChat(conversationId?: string) {
     messages,
     loading,
     sending,
-    fetchConversations,
-    fetchConversation,
-    fetchMessages,
     sendMessage,
-    updateMessage,
-    deleteMessage,
     createConversation,
-    reportMessage,
+    fetchConversations
   };
 }

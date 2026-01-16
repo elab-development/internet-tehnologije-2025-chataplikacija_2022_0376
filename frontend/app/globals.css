@@ -2,8 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+
+
 :root {
-  /* WhatsApp paleta boja */
   --wa-bg-main: #efeae2;          
   --wa-bg-sidebar: #ffffff;       
   --wa-header: #f0f2f5;           

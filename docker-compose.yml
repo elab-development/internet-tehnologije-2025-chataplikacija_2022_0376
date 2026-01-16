@@ -43,9 +43,7 @@ services:
         condition: service_healthy
     networks:
       - chat_network
-    # UKLONJENO: Izbrisana problematična komanda za migracije koja je gasila kontejner
-    # Docker će sada koristiti "CMD" iz tvog Dockerfile-a (npm start)
-
+    
   # Frontend servis
   frontend:
     build:
