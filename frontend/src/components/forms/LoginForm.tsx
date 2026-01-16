@@ -1,85 +1,83 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Mail, Lock } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import Input from '../../components/ui/Input';
-import Button from '../../components/ui/Button';
-import Link from 'next/link';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 
-const loginSchema = z.object({
-  email: z.string().email('Unesite validnu email adresu'),
-  password: z.string().min(6, 'Lozinka mora imati najmanje 6 karaktera'),
-});
+interface LoginFormProps {
+  onSubmit: (email: string, password: string) => Promise<void>;
+  error?: string;
+}
 
-type LoginFormData = z.infer<typeof loginSchema>;
-
-export default function LoginForm() {
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, error }) => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
   });
+  const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
-  const onSubmit = async (data: LoginFormData) => {
-    setIsLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.email || !formData.password) {
+      return;
+    }
+
     try {
-      await login(data);
-    } catch (error) {
-      // Error handled in context
+      setLoading(true);
+      await onSubmit(formData.email, formData.password);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
       <Input
-        label="Email adresa"
         type="email"
-        placeholder="vas@email.com"
-        icon={<Mail size={20} />}
-        error={errors.email?.message}
-        {...register('email')}
+        label="Email Address"
+        placeholder="you@example.com"
+        value={formData.email}
+        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+        icon={<Mail className="h-5 w-5 text-gray-400" />}
+        disabled={loading}
+        required
       />
 
       <Input
-        label="Lozinka"
         type="password"
-        placeholder="••••••••"
-        icon={<Lock size={20} />}
-        error={errors.password?.message}
-        {...register('password')}
+        label="Password"
+        placeholder="Enter your password"
+        value={formData.password}
+        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+        icon={<Lock className="h-5 w-5 text-gray-400" />}
+        disabled={loading}
+        required
       />
 
       <div className="flex items-center justify-between">
-        <label className="flex items-center">
-          <input type="checkbox" className="rounded border-dark-300 text-primary-600 focus:ring-primary-500" />
-          <span className="ml-2 text-sm text-dark-600">Zapamti me</span>
+        <label className="flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+          />
+          <span className="ml-2 text-sm text-gray-600">Remember me</span>
         </label>
-        <Link href="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700">
-          Zaboravili ste lozinku?
-        </Link>
       </div>
 
-      <Button type="submit" className="w-full" isLoading={isLoading}>
-        Prijavi se
+      <Button type="submit" fullWidth loading={loading}>
+        Sign In
       </Button>
-
-      <p className="text-center text-sm text-dark-600">
-        Nemate nalog?{' '}
-        <Link href="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-          Registrujte se
-        </Link>
-      </p>
     </form>
   );
-}
+};

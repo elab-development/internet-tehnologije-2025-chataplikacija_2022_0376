@@ -2,36 +2,20 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, MessageSquare } from 'lucide-react';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import { useAuth } from '@/context/AuthContext';
+import { MessageSquare } from 'lucide-react';
+import { LoginForm } from '@/components/forms/LoginForm';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!formData.email || !formData.password) {
-      setError('All fields are required');
-      return;
-    }
-
+  const handleLogin = async (email: string, password: string) => {
     try {
-      setLoading(true);
-      await login(formData.email, formData.password);
+      setError('');
+      await login(email, password);
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -49,53 +33,16 @@ export default function LoginPage() {
 
         {/* Login Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
+          <LoginForm onSubmit={handleLogin} error={error} />
 
-            <Input
-              type="email"
-              label="Email Address"
-              placeholder="you@example.com"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              icon={<Mail className="h-5 w-5 text-gray-400" />}
-              disabled={loading}
-            />
-
-            <Input
-              type="password"
-              label="Password"
-              placeholder="Enter your password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              icon={<Lock className="h-5 w-5 text-gray-400" />}
-              disabled={loading}
-            />
-
-            <div className="flex items-center justify-between">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="ml-2 text-sm text-gray-600">Remember me</span>
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            <Button type="submit" fullWidth loading={loading}>
-              Sign In
-            </Button>
-          </form>
+          <div className="mt-6 text-center">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+            >
+              Forgot password?
+            </Link>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">

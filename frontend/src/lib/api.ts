@@ -139,6 +139,18 @@ class ApiClient {
   }
 
   // User endpoints
+  async getAllUsers() {
+    const response = await this.client.get('/users');
+    return response.data;
+  }
+
+  async searchUsers(query: string) {
+    const response = await this.client.get('/users/search', {
+      params: { query },
+    });
+    return response.data;
+  }
+
   async suspendUser(userId: string, data: { endDate?: Date; reason: string }) {
     const response = await this.client.post(`/admin/users/${userId}/suspend`, data);
     return response.data;

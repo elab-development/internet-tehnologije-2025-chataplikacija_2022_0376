@@ -1,140 +1,110 @@
 'use client';
 
 import React from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { useAuth } from 'context/AuthContext';
-import {
-  MessageCircle,
-  Users,
-  Settings,
-  Shield,
-  AlertTriangle,
-  X,
-} from 'lucide-react';
-import { cn } from 'lib/utils';
-import Button from 'components/ui/Button';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { MessageSquare, Users, Settings, Shield, Bell } from 'lucide-react';
+import clsx from 'clsx';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types';
 
-interface SidebarProps {
-  isOpen?: boolean;
-  onClose?: () => void;
+interface MenuItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: number;
+  roles?: UserRole[];
 }
 
-export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
+export const Sidebar: React.FC = () => {
   const pathname = usePathname();
-  const router = useRouter();
   const { user } = useAuth();
 
-  const navigation = [
+  const menuItems: MenuItem[] = [
     {
-      name: 'Chatovi',
-      href: '/chat',
-      icon: MessageCircle,
-      roles: ['USER', 'ADMIN', 'MODERATOR'],
+      name: 'Messages',
+      href: '/',
+      icon: MessageSquare,
     },
     {
-      name: 'Korisnici',
-      href: '/users',
+      name: 'Contacts',
+      href: '/contacts',
       icon: Users,
-      roles: ['ADMIN', 'MODERATOR'],
     },
     {
-      name: 'Prijave',
-      href: '/admin/reports',
-      icon: AlertTriangle,
-      roles: ['ADMIN', 'MODERATOR'],
+      name: 'Notifications',
+      href: '/notifications',
+      icon: Bell,
+      badge: 3,
     },
     {
-      name: 'Admin Panel',
-      href: '/admin',
-      icon: Shield,
-      roles: ['ADMIN'],
-    },
-    {
-      name: 'Podešavanja',
+      name: 'Settings',
       href: '/settings',
       icon: Settings,
-      roles: ['USER', 'ADMIN', 'MODERATOR'],
     },
   ];
 
-  const filteredNavigation = navigation.filter((item) =>
-    item.roles.includes(user?.role || 'USER')
-  );
-
-  const handleNavigate = (href: string) => {
-    router.push(href);
-    if (onClose) onClose();
-  };
+  // Add admin menu if user is admin/moderator
+  if (user && (user.role === UserRole.ADMIN || user.role === UserRole.MODERATOR)) {
+    menuItems.push({
+      name: 'Admin',
+      href: '/admin',
+      icon: Shield,
+      roles: [UserRole.ADMIN, UserRole.MODERATOR],
+    });
+  }
 
   return (
-    <>
-      {/* Mobile Overlay */}
-      {isOpen && onClose && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={onClose}
-        />
-      )}
+    <aside className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col">
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900">Navigation</h2>
+      </div>
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          'fixed lg:static inset-y-0 left-0 z-50',
-          'w-64 bg-white border-r border-dark-200',
-          'transform transition-transform duration-200 ease-in-out',
-          'lg:translate-x-0',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
-        {/* Mobile Close Button */}
-        {onClose && (
-          <div className="lg:hidden flex justify-end p-4">
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X size={24} />
-            </Button>
-          </div>
-        )}
-
-        {/* Navigation */}
-        <nav className="flex flex-col gap-1 p-4">
-          {filteredNavigation.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+      <nav className="flex-1 overflow-y-auto p-3">
+        <ul className="space-y-1">
+          {menuItems.map((item) => {
             const Icon = item.icon;
+            const isActive = pathname === item.href;
+
+            // Check role permissions
+            if (item.roles && user && !item.roles.includes(user.role as UserRole)) {
+              return null;
+            }
 
             return (
-              <button
-                key={item.name}
-                onClick={() => handleNavigate(item.href)}
-                className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-                  'text-sm font-medium',
-                  isActive
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-dark-700 hover:bg-dark-50'
-                )}
-              >
-                <Icon size={20} />
-                {item.name}
-              </button>
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={clsx(
+                    'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                    isActive
+                      ? 'bg-primary-50 text-primary-700 font-medium'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  )}
+                >
+                  <Icon className={clsx('h-5 w-5', isActive && 'text-primary-600')} />
+                  <span className="flex-1">{item.name}</span>
+                  {item.badge && (
+                    <span className="px-2 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              </li>
             );
           })}
-        </nav>
+        </ul>
+      </nav>
 
-        {/* User Info */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-dark-200 bg-dark-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold">
-              {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-dark-900 truncate">
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p className="text-xs text-dark-500">{user?.role}</p>
-            </div>
+      {/* User Info Footer */}
+      {user && (
+        <div className="p-4 border-t border-gray-200">
+          <div className="text-sm text-gray-600">
+            <p className="font-medium text-gray-900">{user.username}</p>
+            <p className="text-xs truncate">{user.email}</p>
           </div>
         </div>
-      </aside>
-    </>
+      )}
+    </aside>
   );
-}
+};
