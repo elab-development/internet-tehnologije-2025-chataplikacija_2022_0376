@@ -72,6 +72,9 @@ export class User {
   @Column({ nullable: true })
   profilePicture?: string;
 
+  @Column({ nullable: true })
+  avatar?: string;
+
   @OneToMany(() => Message, (message) => message.sender)
   sentMessages!: Message[];
 

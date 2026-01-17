@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Users, User as UserIcon } from 'lucide-react';
+import { Search, Users, User as UserIcon, X } from 'lucide-react';
 import axios from '../../lib/axios';
 import { User } from '../../types/types';
 import Modal from '../../components/ui/Modal';
@@ -9,7 +9,6 @@ import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
 import toast from 'react-hot-toast';
-import { cn } from '../../lib/utils';
 
 interface NewChatModalProps {
   isOpen: boolean;
@@ -29,6 +28,7 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
     if (isOpen) {
       fetchUsers();
     } else {
+      // Reset state kada se modal zatvori
       setChatType('private');
       setSelectedUsers([]);
       setGroupName('');
@@ -46,11 +46,19 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
     }
   };
 
-  const handleCreateChat = async (overrideUsers?: User[]) => {
-    const finalUsers = overrideUsers || selectedUsers;
+  const handleCreateChat = async () => {
+    if (selectedUsers.length === 0) {
+      toast.error('Molimo izaberite bar jednog korisnika');
+      return;
+    }
 
-    if (finalUsers.length === 0) {
-      toast.error('Molimo izaberite korisnika');
+    if (chatType === 'group' && !groupName.trim()) {
+      toast.error('Molimo unesite naziv grupe');
+      return;
+    }
+
+    if (chatType === 'group' && selectedUsers.length < 2) {
+      toast.error('Grupni chat zahteva najmanje 2 učesnika');
       return;
     }
 
@@ -59,21 +67,16 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
       let response;
       if (chatType === 'private') {
         response = await axios.post('/chats/private', {
-          participantId: finalUsers[0].id,
+          participantId: selectedUsers[0].id,
         });
       } else {
-        if (!groupName.trim()) {
-          toast.error('Molimo unesite naziv grupe');
-          setLoading(false);
-          return;
-        }
         response = await axios.post('/chats/group', {
           name: groupName,
-          participantIds: finalUsers.map((u) => u.id),
+          participantIds: selectedUsers.map((u) => u.id),
         });
       }
 
-      toast.success('Chat uspešno kreiran');
+      toast.success(chatType === 'private' ? 'Chat kreiran!' : 'Grupa kreirana!');
       onChatCreated(response.data.id);
       onClose();
     } catch (error: any) {
@@ -84,29 +87,41 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
     }
   };
 
-  const toggleUserSelection = (user: User) => {
+  const handleUserClick = async (user: User) => {
     if (chatType === 'private') {
-      // Za privatni chat odmah pokrećemo kreiranje na klik
-      setSelectedUsers([user]);
-      handleCreateChat([user]);
+      // Za privatni chat - odmah kreiraj
+      setLoading(true);
+      try {
+        const response = await axios.post('/chats/private', {
+          participantId: user.id,
+        });
+        toast.success('Chat kreiran!');
+        onChatCreated(response.data.id);
+        onClose();
+      } catch (error: any) {
+        toast.error(error.response?.data?.message || 'Greška pri kreiranju chata');
+      } finally {
+        setLoading(false);
+      }
     } else {
-      // Za grupni chat standardna selekcija više korisnika
-      setSelectedUsers((prev) => {
-        const exists = prev.find((u) => u.id === user.id);
-        return exists ? prev.filter((u) => u.id !== user.id) : [...prev, user];
-      });
+      // Za grupni chat - toggle selekcija
+      toggleUserSelection(user);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      if (chatType === 'private' && filteredUsers.length > 0) {
-        // Ako pritisneš enter dok kucaš, započni chat sa prvim rezultatom
-        toggleUserSelection(filteredUsers[0]);
-      } else if (chatType === 'group' && selectedUsers.length > 0 && groupName.trim()) {
-        handleCreateChat();
+  const toggleUserSelection = (user: User) => {
+    setSelectedUsers((prev) => {
+      const exists = prev.find((u) => u.id === user.id);
+      if (exists) {
+        return prev.filter((u) => u.id !== user.id);
+      } else {
+        return [...prev, user];
       }
-    }
+    });
+  };
+
+  const removeSelectedUser = (userId: string) => {
+    setSelectedUsers((prev) => prev.filter((u) => u.id !== userId));
   };
 
   const filteredUsers = users.filter((user) => {
@@ -117,120 +132,228 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Započni novi razgovor" size="lg">
-      <div className="flex flex-col space-y-4 max-h-[80vh]">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh' }}>
         
-        {/* Odabir tipa chata */}
-        <div className="flex p-1 bg-gray-100 rounded-xl">
+        {/* Tip chata */}
+        <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '12px', padding: '4px' }}>
           <button
             onClick={() => { setChatType('private'); setSelectedUsers([]); }}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all",
-              chatType === 'private' ? "bg-white shadow text-blue-600" : "text-gray-500 hover:text-gray-700"
-            )}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 500,
+              background: chatType === 'private' ? 'white' : 'transparent',
+              color: chatType === 'private' ? '#2563eb' : '#6b7280',
+              boxShadow: chatType === 'private' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+            }}
           >
-            <UserIcon size={16} /> Privatni
+            <UserIcon size={18} />
+            Privatni
           </button>
           <button
             onClick={() => { setChatType('group'); setSelectedUsers([]); }}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all",
-              chatType === 'group' ? "bg-white shadow text-blue-600" : "text-gray-500 hover:text-gray-700"
-            )}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 500,
+              background: chatType === 'group' ? 'white' : 'transparent',
+              color: chatType === 'group' ? '#2563eb' : '#6b7280',
+              boxShadow: chatType === 'group' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+            }}
           >
-            <Users size={16} /> Grupni
+            <Users size={18} />
+            Grupni
           </button>
         </div>
 
-        {/* Grupni chat inputi */}
+        {/* Naziv grupe (samo za grupni) */}
         {chatType === 'group' && (
-          <div className="animate-in fade-in slide-in-from-top-2">
-            <Input
-              label="Naziv grupe"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Unesite naziv vaše grupe..."
-              onKeyDown={handleKeyDown}
-            />
+          <Input
+            label="Naziv grupe"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            placeholder="Npr. Dev Tim, Prijatelji..."
+          />
+        )}
+
+        {/* Izabrani korisnici (za grupni chat) */}
+        {chatType === 'group' && selectedUsers.length > 0 && (
+          <div>
+            <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '8px', display: 'block' }}>
+              Izabrani učesnici ({selectedUsers.length})
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {selectedUsers.map((user) => (
+                <div
+                  key={user.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#dbeafe',
+                    color: '#1d4ed8',
+                    padding: '6px 10px',
+                    borderRadius: '20px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <span>{user.firstName} {user.lastName}</span>
+                  <button
+                    onClick={() => removeSelectedUser(user.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      color: '#1d4ed8'
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         {/* Pretraga */}
-        <div className="relative">
-          <Input
-            placeholder="Pronađi prijatelja (Enter za brzi start)..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            icon={<Search size={18} className="text-gray-400" />}
-          />
-        </div>
+        <Input
+          placeholder="Pretraži korisnike..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          icon={<Search size={18} />}
+        />
 
         {/* Lista korisnika */}
-        <div className="flex-1 overflow-y-auto min-h-[300px] border border-gray-100 rounded-xl">
+        <div style={{ 
+          flex: 1, 
+          overflowY: 'auto', 
+          border: '1px solid #e5e7eb', 
+          borderRadius: '12px',
+          minHeight: '250px',
+          maxHeight: '300px'
+        }}>
           {filteredUsers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-              <Search size={40} className="mb-2 opacity-20" />
-              <p>Nismo pronašli korisnika</p>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              padding: '40px',
+              color: '#9ca3af'
+            }}>
+              <Search size={40} style={{ opacity: 0.3, marginBottom: '8px' }} />
+              <p>Nema rezultata</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
-              {filteredUsers.map((user) => {
-                const isSelected = selectedUsers.some((u) => u.id === user.id);
-                return (
-                  <div
-                    key={user.id}
-                    onClick={() => toggleUserSelection(user)}
-                    className={cn(
-                      'flex items-center gap-4 p-4 cursor-pointer transition-all hover:bg-gray-50',
-                      isSelected && 'bg-blue-50/50 hover:bg-blue-50'
-                    )}
-                  >
-                    <Avatar
-                      src={user.avatar}
-                      firstName={user.firstName}
-                      lastName={user.lastName}
-                      size="md"
-                      online={user.isOnline}
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 leading-none mb-1">
-                        {user.firstName} {user.lastName}
-                      </h4>
-                      <p className="text-xs text-gray-500">{user.email}</p>
+            filteredUsers.map((user) => {
+              const isSelected = selectedUsers.some((u) => u.id === user.id);
+              return (
+                <div
+                  key={user.id}
+                  onClick={() => handleUserClick(user)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid #f3f4f6',
+                    background: isSelected ? '#eff6ff' : 'white',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) e.currentTarget.style.background = '#f9fafb';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = isSelected ? '#eff6ff' : 'white';
+                  }}
+                >
+                  <Avatar
+                    src={user.avatar}
+                    firstName={user.firstName}
+                    lastName={user.lastName}
+                    size="md"
+                    online={user.isOnline}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, color: '#111827' }}>
+                      {user.firstName} {user.lastName}
                     </div>
-                    <div className={cn(
-                      "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                      isSelected ? "bg-blue-600 border-blue-600 shadow-sm" : "border-gray-200"
-                    )}>
-                      {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                    <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                      {user.email}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                  {chatType === 'group' && (
+                    <div
+                      style={{
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '50%',
+                        border: isSelected ? 'none' : '2px solid #d1d5db',
+                        background: isSelected ? '#2563eb' : 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {isSelected && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
 
         {/* Footer */}
-        <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-                {selectedUsers.length > 0 ? (
-                    <span>Izabrano: <strong className="text-blue-600">{selectedUsers.length}</strong></span>
-                ) : 'Izaberite nekoga za razgovor'}
-            </div>
-            <div className="flex gap-3">
-                <Button variant="secondary" onClick={onClose} disabled={loading}>
-                    Otkaži
-                </Button>
-                <Button
-                    variant="primary"
-                    onClick={() => handleCreateChat()}
-                    isLoading={loading}
-                    disabled={selectedUsers.length === 0 || (chatType === 'group' && !groupName.trim())}
-                >
-                    Započni Chat
-                </Button>
-            </div>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          paddingTop: '16px',
+          borderTop: '1px solid #e5e7eb'
+        }}>
+          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+            {chatType === 'private' 
+              ? 'Klikni na korisnika za chat' 
+              : `Izabrano: ${selectedUsers.length} (min. 2)`
+            }
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Button variant="secondary" onClick={onClose}>
+              Otkaži
+            </Button>
+            {chatType === 'group' && (
+              <Button
+                variant="primary"
+                onClick={handleCreateChat}
+                isLoading={loading}
+                disabled={selectedUsers.length < 2 || !groupName.trim()}
+              >
+                Započni Grupu
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </Modal>

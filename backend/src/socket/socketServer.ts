@@ -1,69 +1,103 @@
 import { Server } from 'socket.io';
 import { Server as HttpServer } from 'http';
+import jwt from 'jsonwebtoken';
+
+interface JwtPayload {
+  userId: string;
+  email?: string;
+}
 
 export const initializeSocketServer = (httpServer: HttpServer) => {
+  console.log('🔌 Initializing Socket.IO server...');
+  
   const io = new Server(httpServer, {
     cors: {
       origin: process.env.FRONTEND_URL || 'http://localhost:3000',
       methods: ['GET', 'POST'],
       credentials: true,
     },
+    transports: ['websocket', 'polling']
   });
 
   // Mapa za praćenje online korisnika
   const onlineUsers = new Map<string, string>(); // userId -> socketId
 
-  io.on('connection', (socket) => {
-    console.log(`🔌 Novi socket povezan: ${socket.id}`);
+  // ✅ DODAJ JWT AUTHENTICATION MIDDLEWARE
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth.token;
+      
+      console.log('🔐 Socket auth attempt:', { 
+        socketId: socket.id, 
+        hasToken: !!token 
+      });
 
-    // Autentifikacija korisnika na socketu
-    socket.on('setup', (userData: { id: string }) => {
-      if (userData?.id) {
-        socket.join(userData.id);
-        onlineUsers.set(userData.id, socket.id);
-        console.log(`👤 Korisnik ${userData.id} je sada online.`);
-        io.emit('user_online', userData.id);
+      if (!token) {
+        console.error('❌ No token provided');
+        return next(new Error('Authentication error: No token'));
       }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+      
+      console.log('✅ Token verified for user:', decoded.userId);
+      
+      // Attach userId to socket
+      (socket as any).userId = decoded.userId;
+      next();
+    } catch (error: any) {
+      console.error('❌ Socket authentication error:', error.message);
+      next(new Error('Authentication error'));
+    }
+  });
+
+  io.on('connection', (socket) => {
+    const userId = (socket as any).userId;
+    
+    console.log(`🔌 Socket connected:`, { 
+      socketId: socket.id, 
+      userId 
     });
+
+    // ✅ AUTOMATSKI DODAJ KORISNIKA U ONLINE LISTU
+    if (userId) {
+      onlineUsers.set(userId, socket.id);
+      socket.join(userId); // Join personal room
+      console.log(`👤 User ${userId} is now online.`);
+      io.emit('user_online', userId);
+    }
 
     // Pridruživanje konkretnom chatu (sobi)
     socket.on('join_chat', (chatId: string) => {
       socket.join(chatId);
-      console.log(`🏠 Socket ${socket.id} ušao u sobu: ${chatId}`);
+      console.log(`🏠 User ${userId} joined chat room: ${chatId}`);
     });
 
     // Napuštanje sobe
     socket.on('leave_chat', (chatId: string) => {
       socket.leave(chatId);
-      console.log(`🚪 Socket ${socket.id} izašao iz sobe: ${chatId}`);
+      console.log(`🚪 User ${userId} left chat room: ${chatId}`);
     });
 
     // Indikator kucanja (Typing...)
     socket.on('typing', (chatId: string) => {
-      socket.in(chatId).emit('typing', chatId);
+      console.log(`⌨️ User ${userId} typing in chat ${chatId}`);
+      socket.to(chatId).emit('typing', { userId, chatId });
     });
 
     socket.on('stop_typing', (chatId: string) => {
-      socket.in(chatId).emit('stop_typing', chatId);
+      socket.to(chatId).emit('stop_typing', { userId, chatId });
     });
 
     // Diskonekcija
     socket.on('disconnect', () => {
-      let disconnectedUserId: string | null = null;
-      for (const [userId, socketId] of onlineUsers.entries()) {
-        if (socketId === socket.id) {
-          disconnectedUserId = userId;
-          onlineUsers.delete(userId);
-          break;
-        }
-      }
-      
-      if (disconnectedUserId) {
-        console.log(`❌ Korisnik ${disconnectedUserId} je offline.`);
-        io.emit('user_offline', disconnectedUserId);
+      if (userId) {
+        onlineUsers.delete(userId);
+        console.log(`❌ User ${userId} disconnected.`);
+        io.emit('user_offline', userId);
       }
     });
   });
 
+  console.log('✅ Socket.IO server initialized');
   return io;
 };

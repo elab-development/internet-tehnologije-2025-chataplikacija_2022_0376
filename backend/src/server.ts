@@ -1,7 +1,7 @@
-'use client';
 import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { AppDataSource } from './config/database';
@@ -26,12 +26,14 @@ app.use(cors({
   credentials: true,
 }));
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// VAŽNO: Inicijalizacija socketa odmah i kačenje na 'app'
-// Ovo omogućava req.app.get('io') u kontrolerima
+// ✅ KLJUČNI DEO - Initialize Socket.IO
 const io = initializeSocketServer(httpServer);
+
+// ✅ KLJUČNI DEO - Attach Socket.IO to Express app
 app.set('io', io);
 
 // Routes
@@ -53,9 +55,12 @@ app.get('/health', (req, res) => {
 AppDataSource.initialize()
   .then(() => {
     console.log('--- DATABASE CONNECTED SUCCESSFULLY ---');
+    
+    // ✅ Inicijalizuj Socket.IO NAKON što je baza povezana
     httpServer.listen(PORT, () => {
       console.log(`--- SERVER IS RUNNING ON PORT ${PORT} ---`);
       console.log(`--- WEBSOCKET SERVER READY ---`);
+      console.log(`--- Socket.IO listening on ws://localhost:${PORT} ---`);
     });
   })
   .catch((error) => {

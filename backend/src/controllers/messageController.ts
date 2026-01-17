@@ -22,21 +22,27 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         const chatId = chatIdFromBody || conversationId;
         const senderId = req.user!.id;
 
+        console.log('📨 [SEND MESSAGE] Request:', { chatId, senderId, content: content?.substring(0, 50) });
+
         if (!chatId || !content || !content.trim()) {
+            console.log('❌ [SEND MESSAGE] Missing required fields');
             return res.status(400).json({ message: 'Missing chatId or content' });
         }
 
         const messageRepository = AppDataSource.getRepository(Message);
         const membershipRepository = AppDataSource.getRepository(ChatMembership);
 
+        // Proveri da li je korisnik član chata
         const membership = await membershipRepository.findOne({
             where: { chatId, userId: senderId },
         });
 
         if (!membership) {
+            console.log('❌ [SEND MESSAGE] User not member of chat');
             return res.status(403).json({ message: 'Not a member of this chat' });
         }
 
+        // Kreiraj poruku
         const message = messageRepository.create({
             chatId,
             senderId,
@@ -47,29 +53,46 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         });
 
         await messageRepository.save(message);
+        console.log('✅ [SEND MESSAGE] Message saved to database:', message.id);
 
+        // Učitaj poruku sa sender relacijom
         const savedMessage = await messageRepository.findOne({
             where: { id: message.id },
             relations: ['sender'],
         });
 
-        // 🔥 KLJUČNI DEO ZA REAL-TIME:
-        // Preko req.app.get dohvataš 'io' instancu koju si setovao u server.ts ili app.ts
+        if (!savedMessage) {
+            console.error('❌ [SEND MESSAGE] Failed to load saved message');
+            return res.status(500).json({ message: 'Failed to load message' });
+        }
+
+        // 🔥 KLJUČNI DEO - EMIT PORUKU KROZ SOCKET.IO
         const io = req.app.get('io');
-        if (io && savedMessage) {
-            // Emitujemo poruku u "sobu" koja se zove isto kao chatId
-            // Frontend u ChatWindow sluša 'message:new'
-            io.to(chatId).emit('message:new', {
+        
+        if (io) {
+            const messageData = {
                 ...savedMessage,
-                conversationId: chatId // Dodajemo conversationId jer frontend to očekuje u handleNewMessage
+                conversationId: chatId // Frontend očekuje conversationId
+            };
+            
+            // Emit poruku u chat room
+            io.to(chatId).emit('message:new', messageData);
+            
+            console.log('📡 [SOCKET] Message emitted to room:', chatId);
+            console.log('📡 [SOCKET] Message data:', {
+                id: messageData.id,
+                content: messageData.content.substring(0, 50),
+                sender: messageData.sender?.firstName
             });
-            console.log(`📡 [SOCKET] Message emitted to room: ${chatId}`);
+        } else {
+            console.warn('⚠️ [SOCKET] Socket.IO instance not found on app');
         }
 
         return res.status(201).json(savedMessage);
     } catch (error: any) {
         console.error('❌ [SEND MESSAGE] Error:', error.message);
-        return res.status(500).json({ message: 'Server error' });
+        console.error('❌ [SEND MESSAGE] Stack:', error.stack);
+        return res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
 
@@ -105,7 +128,7 @@ export const getChatMessages = async (req: AuthRequest, res: Response) => {
             order: { createdAt: 'ASC' },
         });
 
-        console.log(`✅ [GET MESSAGES] Found ${messages.length} messages`);
+        console.log(`✅ [GET MESSAGES] Found ${messages.length} messages for chat ${chatId}`);
         return res.json(messages);
     } catch (error: any) {
         console.error('❌ [GET MESSAGES] Error:', error.message);
@@ -145,6 +168,7 @@ export const editMessage = async (req: AuthRequest, res: Response) => {
             return res.status(403).json({ message: 'Not authorized to edit this message' });
         }
 
+        // Izmeni poruku
         message.content = content.trim();
         message.isEdited = true;
         await messageRepository.save(message);
@@ -155,7 +179,17 @@ export const editMessage = async (req: AuthRequest, res: Response) => {
             relations: ['sender'],
         });
 
-        console.log('✅ [EDIT MESSAGE] Message updated');
+        // 🔥 EMIT IZMENJENU PORUKU KROZ SOCKET
+        const io = req.app.get('io');
+        if (io && updatedMessage) {
+            io.to(message.chatId).emit('message:edited', {
+                ...updatedMessage,
+                conversationId: message.chatId
+            });
+            console.log('📡 [SOCKET] Message edit emitted to room:', message.chatId);
+        }
+
+        console.log('✅ [EDIT MESSAGE] Message updated:', messageId);
         return res.json(updatedMessage);
     } catch (error: any) {
         console.error('❌ [EDIT MESSAGE] Error:', error.message);
@@ -190,11 +224,23 @@ export const deleteMessage = async (req: AuthRequest, res: Response) => {
             return res.status(403).json({ message: 'Not authorized to delete this message' });
         }
 
+        // Soft delete
         message.isDeleted = true;
         message.content = 'This message has been deleted';
         await messageRepository.save(message);
 
-        console.log('✅ [DELETE MESSAGE] Message deleted');
+        // 🔥 EMIT BRISANJE PORUKE KROZ SOCKET
+        const io = req.app.get('io');
+        if (io) {
+            io.to(message.chatId).emit('message:deleted', {
+                id: messageId,
+                chatId: message.chatId,
+                conversationId: message.chatId
+            });
+            console.log('📡 [SOCKET] Message deletion emitted to room:', message.chatId);
+        }
+
+        console.log('✅ [DELETE MESSAGE] Message deleted:', messageId);
         return res.json({ message: 'Message deleted successfully' });
     } catch (error: any) {
         console.error('❌ [DELETE MESSAGE] Error:', error.message);

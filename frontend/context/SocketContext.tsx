@@ -1,16 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { Socket } from 'socket.io-client';
-import { initSocket, disconnectSocket } from '../lib/socket'; // Dodao sam ../ radi sigurnije putanje
+import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import Cookies from 'js-cookie';
 
 interface SocketContextType {
   socket: Socket | null;
   connected: boolean;
 }
 
-// 1. Dodajemo export ispred Context-a da bi TypeScript bio srećan
 export const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
@@ -19,31 +18,58 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
 
   useEffect(() => {
-    // Socket se inicijalizuje samo ako je korisnik ulogovan
-    if (user) {
-      const token = localStorage.getItem('token');
-      if (token) {
-        const newSocket = initSocket(token);
-        
-        newSocket.on('connect', () => {
-          setConnected(true);
-          console.log('Socket povezan ✅');
-        });
+    console.log('🔄 SocketProvider effect, user:', user?.email);
 
-        newSocket.on('disconnect', () => {
-          setConnected(false);
-          console.log('Socket diskonektovan ❌');
-        });
-
-        setSocket(newSocket);
-
-        return () => {
-          disconnectSocket();
-          setSocket(null);
-          setConnected(false);
-        };
+    if (!user) {
+      if (socket) {
+        console.log('🔌 Disconnecting socket (no user)...');
+        socket.disconnect();
+        setSocket(null);
+        setConnected(false);
       }
+      return;
     }
+
+    // Get token from cookie
+    const token = Cookies.get('auth_token');
+    
+    if (!token) {
+      console.error('❌ No auth token found in cookies');
+      return;
+    }
+
+    console.log('🔌 Connecting to socket with token...');
+    
+    const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    
+    console.log('🔌 Socket URL:', socketUrl);
+
+    const newSocket = io(socketUrl, {
+      auth: { token },
+      withCredentials: true,
+      transports: ['websocket', 'polling']
+    });
+
+    newSocket.on('connect', () => {
+      console.log('✅ Socket connected:', newSocket.id);
+      setConnected(true);
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.log('🔌 Socket disconnected:', reason);
+      setConnected(false);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error.message);
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      console.log('🔌 Cleaning up socket...');
+      newSocket.disconnect();
+    };
   }, [user]);
 
   return (
@@ -53,7 +79,6 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// 2. Eksportujemo hook za korišćenje u komponentama (ChatWindow, itd.)
 export function useSocket() {
   const context = useContext(SocketContext);
   if (context === undefined) {
