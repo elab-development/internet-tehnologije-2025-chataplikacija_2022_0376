@@ -5,16 +5,26 @@ import { AppDataSource } from '../config/database';
 import { User, UserStatus } from '../entities/User';
 import crypto from 'crypto';
 
-// Cookie opcije
-// Cookie opcije
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production', 
-  sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'lax' | 'none' | 'strict',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dana
-  path: '/',
+// ✅ Cookie opcije - SECURE MORA BITI FALSE za localhost!
+const getCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  console.log('🍪 [COOKIE] Environment:', process.env.NODE_ENV);
+  console.log('🍪 [COOKIE] Is production:', isProduction);
+  
+  const options = {
+    httpOnly: false,
+    secure: false, // ✅ UVEK FALSE za localhost developm ent
+    sameSite: 'lax' as const,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dana
+    path: '/',
+  };
+  
+  console.log('🍪 [COOKIE] Options:', options);
+  return options;
 };
-// Token
+
+// Token generation
 const signToken = (userId: string): string => {
   return jwt.sign({ userId }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
 };
@@ -22,11 +32,19 @@ const signToken = (userId: string): string => {
 // ---------------------- REGISTER ----------------------
 export const register = async (req: Request, res: Response) => {
   try {
+    console.log('📝 [REGISTER] Request received');
+    console.log('📝 [REGISTER] Body:', {
+      email: req.body.email,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+    });
+
     const { email, password, firstName, lastName, avatar } = req.body;
     const userRepo = AppDataSource.getRepository(User);
 
     const existingUser = await userRepo.findOne({ where: { email } });
     if (existingUser) {
+      console.log('❌ [REGISTER] User already exists:', email);
       return res.status(400).json({ message: 'Već imate profil sa ovom email adresom.' });
     }
 
@@ -41,24 +59,44 @@ export const register = async (req: Request, res: Response) => {
     });
 
     await userRepo.save(user);
+    console.log('✅ [REGISTER] User created:', user.id);
 
+    // Generate token
     const token = signToken(user.id);
+    console.log('🔑 [REGISTER] Token generated:', token.substring(0, 30) + '...');
+
+    // Set cookie
+    const cookieOptions = getCookieOptions();
     res.cookie('auth_token', token, cookieOptions);
+    
+    console.log('🍪 [REGISTER] Calling res.cookie() with:', {
+      name: 'auth_token',
+      token: token.substring(0, 30) + '...',
+      options: cookieOptions
+    });
+
+    const userData = {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatar: user.avatar,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
+
+    console.log('✅ [REGISTER] Sending success response');
 
     res.status(201).json({
       message: 'Uspešno ste se registrovali!',
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        avatar: user.avatar,
-        role: user.role,
-        createdAt: user.createdAt,
-      },
+      user: userData,
     });
-  } catch (error) {
-    console.error('Registration error:', error);
+
+    // Log nakon slanja response-a
+    console.log('📤 [REGISTER] Response sent, headers:', res.getHeaders());
+  } catch (error: any) {
+    console.error('❌ [REGISTER] Error:', error.message);
+    console.error('❌ [REGISTER] Stack:', error.stack);
     res.status(500).json({ message: 'Greška na serveru' });
   }
 };
@@ -66,37 +104,65 @@ export const register = async (req: Request, res: Response) => {
 // ---------------------- LOGIN ----------------------
 export const login = async (req: Request, res: Response) => {
   try {
+    console.log('🔐 [LOGIN] Request received');
+    console.log('🔐 [LOGIN] Email:', req.body.email);
+
     const { email, password } = req.body;
     const userRepo = AppDataSource.getRepository(User);
 
     const user = await userRepo.findOne({ where: { email } });
-    if (!user) return res.status(401).json({ message: 'Neispravan email ili lozinka' });
+    if (!user) {
+      console.log('❌ [LOGIN] User not found:', email);
+      return res.status(401).json({ message: 'Neispravan email ili lozinka' });
+    }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) return res.status(401).json({ message: 'Neispravan email ili lozinka' });
+    if (!isValidPassword) {
+      console.log('❌ [LOGIN] Invalid password for:', email);
+      return res.status(401).json({ message: 'Neispravan email ili lozinka' });
+    }
 
     // Update online status
     user.isOnline = true;
     user.lastSeen = new Date();
     await userRepo.save(user);
+    console.log('✅ [LOGIN] User online status updated');
 
+    // Generate token
     const token = signToken(user.id);
+    console.log('🔑 [LOGIN] Token generated:', token.substring(0, 30) + '...');
+
+    // Set cookie
+    const cookieOptions = getCookieOptions();
     res.cookie('auth_token', token, cookieOptions);
+    
+    console.log('🍪 [LOGIN] Calling res.cookie() with:', {
+      name: 'auth_token',
+      token: token.substring(0, 30) + '...',
+      options: cookieOptions
+    });
+
+    const userData = {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatar: user.avatar,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
+
+    console.log('✅ [LOGIN] Sending success response');
 
     res.json({
       message: 'Uspešno ste se prijavili!',
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        avatar: user.avatar,
-        role: user.role,
-        createdAt: user.createdAt,
-      },
+      user: userData,
     });
-  } catch (error) {
-    console.error('Login error:', error);
+
+    console.log('📤 [LOGIN] Response sent, headers:', res.getHeaders());
+  } catch (error: any) {
+    console.error('❌ [LOGIN] Error:', error.message);
+    console.error('❌ [LOGIN] Stack:', error.stack);
     res.status(500).json({ message: 'Greška na serveru' });
   }
 };
@@ -105,6 +171,8 @@ export const login = async (req: Request, res: Response) => {
 export const logout = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.userId;
+    console.log('👋 [LOGOUT] Request for user:', userId);
+
     if (userId) {
       const userRepo = AppDataSource.getRepository(User);
       await userRepo.update(userId, { isOnline: false, lastSeen: new Date() });
@@ -112,15 +180,17 @@ export const logout = async (req: Request, res: Response) => {
 
     res.cookie('auth_token', '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false,
       sameSite: 'lax',
       expires: new Date(0),
       path: '/',
     });
 
+    console.log('✅ [LOGOUT] Cookie cleared');
+
     res.json({ message: 'Uspešno ste se odjavili!' });
-  } catch (error) {
-    console.error('Logout error:', error);
+  } catch (error: any) {
+    console.error('❌ [LOGOUT] Error:', error.message);
     res.status(500).json({ message: 'Greška na serveru' });
   }
 };
@@ -129,12 +199,22 @@ export const logout = async (req: Request, res: Response) => {
 export const getMe = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.userId;
-    if (!userId) return res.status(401).json({ message: 'Niste prijavljeni' });
+    console.log('👤 [GET ME] Request for user:', userId);
+
+    if (!userId) {
+      console.log('❌ [GET ME] No userId in request');
+      return res.status(401).json({ message: 'Niste prijavljeni' });
+    }
 
     const userRepo = AppDataSource.getRepository(User);
     const user = await userRepo.findOne({ where: { id: userId } });
 
-    if (!user) return res.status(404).json({ message: 'Korisnik nije pronađen' });
+    if (!user) {
+      console.log('❌ [GET ME] User not found:', userId);
+      return res.status(404).json({ message: 'Korisnik nije pronađen' });
+    }
+
+    console.log('✅ [GET ME] User found:', user.email);
 
     res.json({
       user: {
@@ -148,8 +228,8 @@ export const getMe = async (req: Request, res: Response) => {
         createdAt: user.createdAt,
       },
     });
-  } catch (error) {
-    console.error('GetMe error:', error);
+  } catch (error: any) {
+    console.error('❌ [GET ME] Error:', error.message);
     res.status(500).json({ message: 'Greška na serveru' });
   }
 };
@@ -161,7 +241,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const userRepo = AppDataSource.getRepository(User);
     const user = await userRepo.findOne({ where: { email } });
 
-    if (!user) return res.json({ message: 'Ako nalog postoji, link za resetovanje je poslat na vaš email.' });
+    if (!user) {
+      return res.json({ message: 'Ako nalog postoji, link za resetovanje je poslat na vaš email.' });
+    }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenExpires = new Date(Date.now() + 3600000); // 1h
@@ -171,11 +253,11 @@ export const forgotPassword = async (req: Request, res: Response) => {
     await userRepo.save(user);
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-    console.log('Reset password link:', resetUrl);
+    console.log('🔗 Reset password link:', resetUrl);
 
     res.json({ message: 'Link za resetovanje lozinke je poslat na vaš email.' });
-  } catch (error) {
-    console.error('Forgot password error:', error);
+  } catch (error: any) {
+    console.error('❌ [FORGOT PASSWORD] Error:', error.message);
     res.status(500).json({ message: 'Greška na serveru' });
   }
 };
@@ -198,8 +280,8 @@ export const resetPassword = async (req: Request, res: Response) => {
     await userRepo.save(user);
 
     res.json({ message: 'Lozinka je uspešno promenjena. Možete se prijaviti.' });
-  } catch (error) {
-    console.error('Reset password error:', error);
+  } catch (error: any) {
+    console.error('❌ [RESET PASSWORD] Error:', error.message);
     res.status(500).json({ message: 'Greška na serveru' });
   }
 };
@@ -212,17 +294,21 @@ export const changePassword = async (req: Request, res: Response) => {
     const userRepo = AppDataSource.getRepository(User);
 
     const user = await userRepo.findOne({ where: { id: userId } });
-    if (!user) return res.status(404).json({ message: 'Korisnik nije pronađen.' });
+    if (!user) {
+      return res.status(404).json({ message: 'Korisnik nije pronađen.' });
+    }
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Trenutna lozinka nije tačna.' });
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Trenutna lozinka nije tačna.' });
+    }
 
     user.password = await bcrypt.hash(newPassword, 12);
     await userRepo.save(user);
 
     res.json({ message: 'Lozinka je uspešno promenjena.' });
-  } catch (error) {
-    console.error('Change password error:', error);
+  } catch (error: any) {
+    console.error('❌ [CHANGE PASSWORD] Error:', error.message);
     res.status(500).json({ message: 'Greška na serveru' });
   }
 };
