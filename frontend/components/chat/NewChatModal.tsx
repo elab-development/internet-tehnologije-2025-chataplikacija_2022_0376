@@ -46,37 +46,22 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
     }
   };
 
-  const toggleUserSelection = (user: User) => {
-    setSelectedUsers((prev) => {
-      const exists = prev.find((u) => u.id === user.id);
-      if (exists) {
-        return prev.filter((u) => u.id !== user.id);
-      } else {
-        // Ako je privatni chat, dozvoli samo jednog selektovanog korisnika
-        return chatType === 'private' ? [user] : [...prev, user];
-      }
-    });
-  };
+  const handleCreateChat = async (overrideUsers?: User[]) => {
+    const finalUsers = overrideUsers || selectedUsers;
 
-  const handleCreateChat = async () => {
-    if (selectedUsers.length === 0) {
+    if (finalUsers.length === 0) {
       toast.error('Molimo izaberite korisnika');
       return;
     }
 
     setLoading(true);
-
     try {
       let response;
-      
-      // PRILAGOĐAVANJE TVOM BACKEND KONTROLERU:
       if (chatType === 'private') {
-        // Tvoj backend za privatni chat traži participantId u body-ju
         response = await axios.post('/chats/private', {
-          participantId: selectedUsers[0].id,
+          participantId: finalUsers[0].id,
         });
       } else {
-        // Grupni chat traži name i participantIds niz
         if (!groupName.trim()) {
           toast.error('Molimo unesite naziv grupe');
           setLoading(false);
@@ -84,7 +69,7 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
         }
         response = await axios.post('/chats/group', {
           name: groupName,
-          participantIds: selectedUsers.map((u) => u.id),
+          participantIds: finalUsers.map((u) => u.id),
         });
       }
 
@@ -96,6 +81,31 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
       toast.error(error.response?.data?.message || 'Greška pri kreiranju chata');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleUserSelection = (user: User) => {
+    if (chatType === 'private') {
+      // Za privatni chat odmah pokrećemo kreiranje na klik
+      setSelectedUsers([user]);
+      handleCreateChat([user]);
+    } else {
+      // Za grupni chat standardna selekcija više korisnika
+      setSelectedUsers((prev) => {
+        const exists = prev.find((u) => u.id === user.id);
+        return exists ? prev.filter((u) => u.id !== user.id) : [...prev, user];
+      });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (chatType === 'private' && filteredUsers.length > 0) {
+        // Ako pritisneš enter dok kucaš, započni chat sa prvim rezultatom
+        toggleUserSelection(filteredUsers[0]);
+      } else if (chatType === 'group' && selectedUsers.length > 0 && groupName.trim()) {
+        handleCreateChat();
+      }
     }
   };
 
@@ -131,7 +141,7 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
           </button>
         </div>
 
-        {/* Unos imena grupe */}
+        {/* Grupni chat inputi */}
         {chatType === 'group' && (
           <div className="animate-in fade-in slide-in-from-top-2">
             <Input
@@ -139,7 +149,7 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               placeholder="Unesite naziv vaše grupe..."
-              className="border-blue-100 focus:border-blue-500"
+              onKeyDown={handleKeyDown}
             />
           </div>
         )}
@@ -147,9 +157,10 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
         {/* Pretraga */}
         <div className="relative">
           <Input
-            placeholder="Pronađi prijatelja po imenu ili email-u..."
+            placeholder="Pronađi prijatelja (Enter za brzi start)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
             icon={<Search size={18} className="text-gray-400" />}
           />
         </div>
@@ -200,7 +211,7 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
           )}
         </div>
 
-        {/* Footer sa dugmetom */}
+        {/* Footer */}
         <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
             <div className="text-sm text-gray-500">
                 {selectedUsers.length > 0 ? (
@@ -213,7 +224,7 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
                 </Button>
                 <Button
                     variant="primary"
-                    onClick={handleCreateChat}
+                    onClick={() => handleCreateChat()}
                     isLoading={loading}
                     disabled={selectedUsers.length === 0 || (chatType === 'group' && !groupName.trim())}
                 >

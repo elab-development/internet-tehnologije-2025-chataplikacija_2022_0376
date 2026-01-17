@@ -1,3 +1,4 @@
+'use client';
 import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
@@ -28,6 +29,11 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// VAŽNO: Inicijalizacija socketa odmah i kačenje na 'app'
+// Ovo omogućava req.app.get('io') u kontrolerima
+const io = initializeSocketServer(httpServer);
+app.set('io', io);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes); 
@@ -35,7 +41,6 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/reports', reportRoutes);
 
-// Health check ruta - služi da proveriš da li server radi
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -44,18 +49,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`--- SERVER IS RUNNING ON PORT ${PORT} ---`);
-  console.log(`--- HEALTH CHECK: http://localhost:${PORT}/health ---`);
-});
-
-
+// Database & Server Start
 AppDataSource.initialize()
   .then(() => {
     console.log('--- DATABASE CONNECTED SUCCESSFULLY ---');
-    
-    initializeSocketServer(httpServer);
-    console.log('--- WEBSOCKET SERVER INITIALIZED ---');
+    httpServer.listen(PORT, () => {
+      console.log(`--- SERVER IS RUNNING ON PORT ${PORT} ---`);
+      console.log(`--- WEBSOCKET SERVER READY ---`);
+    });
   })
   .catch((error) => {
     console.error('!!! DATABASE CONNECTION FAILED !!!');

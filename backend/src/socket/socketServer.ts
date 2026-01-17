@@ -1,17 +1,8 @@
-import { Server as SocketIOServer, Socket } from 'socket.io';
-import { Server as HTTPServer } from 'http';
-import jwt from 'jsonwebtoken';
-import { AppDataSource } from '../config/database';
-import { User } from '../entities/User';
+import { Server } from 'socket.io';
+import { Server as HttpServer } from 'http';
 
-// Tipizacija socket-a sa userId i user
-interface AuthenticatedSocket extends Socket {
-  userId: string;
-  user?: User;
-}
-
-export const initializeSocketServer = (httpServer: HTTPServer) => {
-  const io = new SocketIOServer(httpServer, {
+export const initializeSocketServer = (httpServer: HttpServer) => {
+  const io = new Server(httpServer, {
     cors: {
       origin: process.env.FRONTEND_URL || 'http://localhost:3000',
       methods: ['GET', 'POST'],
@@ -19,91 +10,57 @@ export const initializeSocketServer = (httpServer: HTTPServer) => {
     },
   });
 
-  // Authentication middleware
-  io.use(async (socket, next) => {
-    const authSocket = socket as AuthenticatedSocket;
-
-    try {
-      const token = authSocket.handshake.auth.token;
-      if (!token) {
-        return next(new Error('Authentication error'));
-      }
-
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({ where: { id: decoded.userId } });
-
-      if (!user) {
-        return next(new Error('User not found'));
-      }
-
-      authSocket.userId = user.id;
-      authSocket.user = user;
-      next();
-    } catch (error) {
-      next(new Error('Authentication error'));
-    }
-  });
+  // Mapa za praćenje online korisnika
+  const onlineUsers = new Map<string, string>(); // userId -> socketId
 
   io.on('connection', (socket) => {
-    const authSocket = socket as AuthenticatedSocket;
-    console.log(`User connected: ${authSocket.userId}`);
+    console.log(`🔌 Novi socket povezan: ${socket.id}`);
 
-    // Join user's personal room
-    authSocket.join(`user:${authSocket.userId}`);
-
-    // Join chat room
-    authSocket.on('join_chat', (chatId: string) => {
-      authSocket.join(`chat:${chatId}`);
-      console.log(`User ${authSocket.userId} joined chat ${chatId}`);
+    // Autentifikacija korisnika na socketu
+    socket.on('setup', (userData: { id: string }) => {
+      if (userData?.id) {
+        socket.join(userData.id);
+        onlineUsers.set(userData.id, socket.id);
+        console.log(`👤 Korisnik ${userData.id} je sada online.`);
+        io.emit('user_online', userData.id);
+      }
     });
 
-    // Leave chat room
-    authSocket.on('leave_chat', (chatId: string) => {
-      authSocket.leave(`chat:${chatId}`);
-      console.log(`User ${authSocket.userId} left chat ${chatId}`);
+    // Pridruživanje konkretnom chatu (sobi)
+    socket.on('join_chat', (chatId: string) => {
+      socket.join(chatId);
+      console.log(`🏠 Socket ${socket.id} ušao u sobu: ${chatId}`);
     });
 
-    // Send message
-    authSocket.on('send_message', (data: { chatId: string; [key: string]: any }) => {
-      io.to(`chat:${data.chatId}`).emit('new_message', data);
+    // Napuštanje sobe
+    socket.on('leave_chat', (chatId: string) => {
+      socket.leave(chatId);
+      console.log(`🚪 Socket ${socket.id} izašao iz sobe: ${chatId}`);
     });
 
-    // Edit message
-    authSocket.on('edit_message', (data: { chatId: string; [key: string]: any }) => {
-      io.to(`chat:${data.chatId}`).emit('message_edited', data);
+    // Indikator kucanja (Typing...)
+    socket.on('typing', (chatId: string) => {
+      socket.in(chatId).emit('typing', chatId);
     });
 
-    // Delete message
-    authSocket.on('delete_message', (data: { chatId: string; [key: string]: any }) => {
-      io.to(`chat:${data.chatId}`).emit('message_deleted', data);
+    socket.on('stop_typing', (chatId: string) => {
+      socket.in(chatId).emit('stop_typing', chatId);
     });
 
-    // Typing indicator
-    authSocket.on('typing_start', (data: { chatId: string; userName: string }) => {
-      authSocket.to(`chat:${data.chatId}`).emit('user_typing', {
-        userId: authSocket.userId,
-        userName: data.userName,
-      });
-    });
-
-    authSocket.on('typing_stop', (data: { chatId: string }) => {
-      authSocket.to(`chat:${data.chatId}`).emit('user_stopped_typing', {
-        userId: authSocket.userId,
-      });
-    });
-
-    // Disconnect
-    authSocket.on('disconnect', async () => {
-      console.log(`User disconnected: ${authSocket.userId}`);
-
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({ where: { id: authSocket.userId } });
-
-      if (user) {
-        user.isOnline = false;
-        user.lastSeen = new Date();
-        await userRepository.save(user);
+    // Diskonekcija
+    socket.on('disconnect', () => {
+      let disconnectedUserId: string | null = null;
+      for (const [userId, socketId] of onlineUsers.entries()) {
+        if (socketId === socket.id) {
+          disconnectedUserId = userId;
+          onlineUsers.delete(userId);
+          break;
+        }
+      }
+      
+      if (disconnectedUserId) {
+        console.log(`❌ Korisnik ${disconnectedUserId} je offline.`);
+        io.emit('user_offline', disconnectedUserId);
       }
     });
   });

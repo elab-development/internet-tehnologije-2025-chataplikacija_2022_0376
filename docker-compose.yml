@@ -2,7 +2,7 @@ services:
   # PostgreSQL baza podataka
   postgres:
     image: postgres:15-alpine
-    container_name: chat_db
+    container_name: chat_db_new
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -24,7 +24,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: chat_backend
+    container_name: chat_backend_new
     environment:
       NODE_ENV: production
       PORT: 5000
@@ -49,7 +49,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: chat_frontend
+    container_name: chat_frontend_new
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:5000/api
       NEXT_PUBLIC_WS_URL: http://localhost:5000

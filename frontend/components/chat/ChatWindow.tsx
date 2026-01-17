@@ -42,13 +42,31 @@ export default function ChatWindow({
   }, [conversationId]);
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !conversationId) return;
+
+    socket.emit('join_chat', conversationId);
+    console.log(`🏠 [SOCKET] Joined room: ${conversationId}`);
+
+    const handleNewMessage = (message: Message) => {
+      // PROVERA DUPLIKATA: Proveravamo da li poruka već postoji u nizu po ID-u
+      setMessages((prev) => {
+        const alreadyExists = prev.some((m) => m.id === message.id);
+        if (alreadyExists) return prev;
+        
+        // Dodajemo samo ako je poruka za ovaj chat
+        if (message.conversationId === conversationId || message.conversationId === conversationId) {
+          return [...prev, message];
+        }
+        return prev;
+      });
+    };
 
     socket.on('message:new', handleNewMessage);
     socket.on('message:updated', handleMessageUpdated);
     socket.on('message:deleted', handleMessageDeleted);
 
     return () => {
+      socket.emit('leave_chat', conversationId);
       socket.off('message:new', handleNewMessage);
       socket.off('message:updated', handleMessageUpdated);
       socket.off('message:deleted', handleMessageDeleted);
@@ -62,47 +80,28 @@ export default function ChatWindow({
   const fetchConversationData = async () => {
     try {
       setLoading(true);
-      
-      console.log('🔄 [CHAT WINDOW] Fetching conversation:', conversationId);
-      
       const [convResponse, messagesResponse] = await Promise.all([
         axios.get(`/chats/${conversationId}`),
         axios.get(`/chats/${conversationId}/messages`),
       ]);
       
-      console.log('✅ [CHAT WINDOW] Conversation loaded:', convResponse.data);
-      console.log('✅ [CHAT WINDOW] Messages loaded:', messagesResponse.data.length);
-      
       setConversation(convResponse.data);
       setMessages(messagesResponse.data);
     } catch (error: any) {
-      console.error('❌ [CHAT WINDOW] Error fetching conversation:', error);
-      console.error('❌ [CHAT WINDOW] Error details:', error.response?.data);
-      console.error('❌ [CHAT WINDOW] Error status:', error.response?.status);
+      console.error('❌ [CHAT WINDOW] Error:', error);
       toast.error('Greška pri učitavanju konverzacije');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNewMessage = (message: Message) => {
-    console.log('📩 [CHAT WINDOW] New message received:', message.id);
-    if (message.conversationId === conversationId) {
-      setMessages((prev) => [...prev, message]);
-    }
-  };
-
   const handleMessageUpdated = (updatedMessage: Message) => {
-    console.log('✏️ [CHAT WINDOW] Message updated:', updatedMessage.id);
-    if (updatedMessage.conversationId  === conversationId) {
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === updatedMessage.id ? updatedMessage : msg))
-      );
-    }
+    setMessages((prev) =>
+      prev.map((msg) => (msg.id === updatedMessage.id ? updatedMessage : msg))
+    );
   };
 
   const handleMessageDeleted = (messageId: string) => {
-    console.log('🗑️ [CHAT WINDOW] Message deleted:', messageId);
     setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
   };
 
@@ -112,125 +111,83 @@ export default function ChatWindow({
 
   const handleSendMessage = async (content: string, file?: File) => {
     try {
-      console.log('📤 [CHAT WINDOW] Sending message:', { 
-        content: content.substring(0, 50), 
-        hasFile: !!file, 
-        conversationId 
-      });
-
       if (editingMessage) {
-        // Update existing message
-        console.log('✏️ [CHAT WINDOW] Editing message:', editingMessage.id);
-        
         await axios.put(`/messages/${editingMessage.id}`, { content });
         setEditingMessage(null);
         toast.success('Poruka izmenjena');
       } else {
-        // Send new message
         if (file) {
-          // Ako postoji file, koristi FormData
           const formData = new FormData();
           formData.append('content', content);
-          formData.append('conversationId', conversationId); // Backend će ovo mapirati na chatId
+          formData.append('conversationId', conversationId);
           formData.append('file', file);
-
-          console.log('📎 [CHAT WINDOW] Sending with file');
 
           await axios.post('/messages', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           });
         } else {
-          // Obična text poruka
-          console.log('💬 [CHAT WINDOW] Sending text message');
-          
           await axios.post('/messages', {
             content,
-            conversationId, // Backend će ovo mapirati na chatId
+            conversationId,
           });
         }
-
-        console.log('✅ [CHAT WINDOW] Message sent successfully');
       }
     } catch (error: any) {
-      console.error('❌ [CHAT WINDOW] Error sending message:', error);
-      console.error('❌ [CHAT WINDOW] Error response:', error.response?.data);
-      console.error('❌ [CHAT WINDOW] Error status:', error.response?.status);
-      toast.error(error.response?.data?.message || 'Greška pri slanju poruke');
+      toast.error(error.response?.data?.message || 'Greška pri slanju');
     }
   };
 
   const handleEditMessage = (messageId: string) => {
     const message = messages.find((m) => m.id === messageId);
     if (message) {
-      console.log('✏️ [CHAT WINDOW] Starting edit:', messageId);
       setEditingMessage({ id: message.id, content: message.content });
     }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
-    if (!confirm('Da li ste sigurni da želite da obrišete poruku?')) return;
-
+    if (!confirm('Da li želite da obrišete poruku?')) return;
     try {
-      console.log('🗑️ [CHAT WINDOW] Deleting message:', messageId);
       await axios.delete(`/messages/${messageId}`);
       toast.success('Poruka obrisana');
-    } catch (error: any) {
-      console.error('❌ [CHAT WINDOW] Error deleting message:', error);
-      toast.error('Greška pri brisanju poruke');
+    } catch (error) {
+      toast.error('Greška pri brisanju');
     }
   };
 
   const handleReportMessage = (messageId: string) => {
-    console.log('🚨 [CHAT WINDOW] Reporting message:', messageId);
     setReportingMessageId(messageId);
     setReportModalOpen(true);
   };
 
   const submitReport = async () => {
-    if (!reportingMessageId || !reportReason) {
-      toast.error('Molimo unesite razlog prijave');
-      return;
-    }
-
+    if (!reportingMessageId || !reportReason) return toast.error('Unesite razlog');
     try {
-      console.log('🚨 [CHAT WINDOW] Submitting report:', reportingMessageId);
-      
       await axios.post('/reports', {
         messageId: reportingMessageId,
         reason: reportReason,
         comment: reportComment,
       });
-      
-      toast.success('Poruka prijavljena');
+      toast.success('Prijavljeno');
       setReportModalOpen(false);
-      setReportingMessageId(null);
-      setReportReason('');
-      setReportComment('');
-    } catch (error: any) {
-      console.error('❌ [CHAT WINDOW] Error reporting message:', error);
-      toast.error('Greška pri prijavljivanju poruke');
+    } catch (error) {
+      toast.error('Greška pri prijavi');
     }
   };
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-gray-50">
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+      <div className="h-full flex items-center justify-center bg-white">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
       </div>
     );
   }
 
   if (!conversation) {
-    return (
-      <div className="h-full flex items-center justify-center bg-gray-50">
-        <p className="text-gray-600">Konverzacija nije pronađena</p>
-      </div>
-    );
+    return <div className="h-full flex items-center justify-center">Čat nije pronađen.</div>;
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* Header */}
+    <div className="h-full flex flex-col bg-[#F0F2F5]">
       <ChatHeader
         conversation={conversation}
         currentUser={currentUser}
@@ -238,11 +195,10 @@ export default function ChatWindow({
         onOpenInfo={() => setShowInfoModal(true)}
       />
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            <p>Nema poruka. Započnite konverzaciju!</p>
+          <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+            Nema poruka. Recite "Zdravo!"
           </div>
         ) : (
           messages.map((message, index) => {
@@ -266,45 +222,30 @@ export default function ChatWindow({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <MessageInput
         onSendMessage={handleSendMessage}
         editingMessage={editingMessage}
         onCancelEdit={() => setEditingMessage(null)}
       />
 
-      {/* Report Modal */}
-      <Modal
-        isOpen={reportModalOpen}
-        onClose={() => setReportModalOpen(false)}
-        title="Prijavi poruku"
-      >
-        <div className="space-y-4">
+      <Modal isOpen={reportModalOpen} onClose={() => setReportModalOpen(false)} title="Prijavi poruku">
+        <div className="space-y-4 p-1">
           <Input
             label="Razlog prijave"
             value={reportReason}
             onChange={(e) => setReportReason(e.target.value)}
-            placeholder="Spam, uvredljiv sadržaj, itd."
+            placeholder="Npr. Spam, Uvreda..."
           />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Dodatni komentar (opciono)
-            </label>
-            <textarea
-              value={reportComment}
-              onChange={(e) => setReportComment(e.target.value)}
-              rows={4}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Opišite problem detaljnije..."
-            />
-          </div>
+          <textarea
+            value={reportComment}
+            onChange={(e) => setReportComment(e.target.value)}
+            className="w-full p-2 border rounded-md"
+            rows={3}
+            placeholder="Dodatni opis..."
+          />
           <div className="flex gap-2 justify-end">
-            <Button variant="secondary" onClick={() => setReportModalOpen(false)}>
-              Otkaži
-            </Button>
-            <Button variant="danger" onClick={submitReport}>
-              Prijavi
-            </Button>
+            <Button variant="secondary" onClick={() => setReportModalOpen(false)}>Otkaži</Button>
+            <Button variant="danger" onClick={submitReport}>Prijavi</Button>
           </div>
         </div>
       </Modal>

@@ -20,42 +20,28 @@ export default function ChatHeader({
   onOpenInfo,
 }: ChatHeaderProps) {
   const isGroup = conversation.type === 'group';
+  // Nalazimo onog ko NIJE ulogovan korisnik
   const otherParticipant = conversation.participants.find(p => p.id !== currentUser.id);
   
   const displayName = isGroup
     ? conversation.name
     : otherParticipant
     ? `${otherParticipant.firstName} ${otherParticipant.lastName}`
-    : 'Chat';
-
-  const statusText = isGroup
-    ? `${conversation.participants.length} učesnika`
-    : otherParticipant?.isOnline
-    ? 'Online'
-    : 'Offline';
+    : 'Korisnik';
 
   return (
-    <div className="h-16 bg-white border-b border-dark-200 flex items-center justify-between px-4">
-      {/* Left Section */}
+    <div className="h-[70px] bg-white border-b border-gray-200 flex items-center justify-between px-4 z-10 shadow-sm">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {onBack && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="lg:hidden -ml-2"
-          >
+          <Button variant="ghost" size="sm" onClick={onBack} className="lg:hidden">
             <ArrowLeft size={20} />
           </Button>
         )}
 
-        <div
-          className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-          onClick={onOpenInfo}
-        >
+        <div className="flex items-center gap-3 cursor-pointer" onClick={onOpenInfo}>
           {isGroup ? (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center flex-shrink-0">
-              <Users size={20} className="text-white" />
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <Users size={20} className="text-blue-600" />
             </div>
           ) : (
             <Avatar
@@ -67,25 +53,39 @@ export default function ChatHeader({
             />
           )}
 
-          <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-dark-900 truncate">{displayName}</h2>
-            <p className="text-xs text-dark-500">{statusText}</p>
+          <div className="flex flex-col">
+            <h2 className="font-bold text-gray-900 text-sm truncate leading-tight">
+              {displayName}
+            </h2>
+            <p className={cn(
+              "text-[11px] font-medium",
+              !isGroup && otherParticipant?.isOnline ? "text-green-500" : "text-gray-400"
+            )}>
+              {isGroup 
+                ? `${conversation.participants.length} učesnika` 
+                : otherParticipant?.isOnline ? 'Aktivan' : 'Van mreže'}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Right Section */}
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" className="hidden sm:flex">
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" className="text-blue-600 hover:bg-blue-50 rounded-full p-2">
           <Video size={20} />
         </Button>
-        <Button variant="ghost" size="sm" className="hidden sm:flex">
+        <Button variant="ghost" className="text-blue-600 hover:bg-blue-50 rounded-full p-2">
           <Phone size={20} />
         </Button>
-        <Button variant="ghost" size="sm" onClick={onOpenInfo}>
+        <div className="w-[1px] h-6 bg-gray-200 mx-1" />
+        <Button variant="ghost" onClick={onOpenInfo} className="text-gray-400 hover:bg-gray-100 rounded-full p-2">
           <MoreVertical size={20} />
         </Button>
       </div>
     </div>
   );
+}
+
+// Pomoćna funkcija unutar fajla ili importovana
+function cn(...classes: any[]) {
+  return classes.filter(Boolean).join(' ');
 }

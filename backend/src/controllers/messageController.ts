@@ -10,7 +10,6 @@ import { ChatMembership } from '../entities/ChatMembership';
  */
 export const sendMessage = async (req: AuthRequest, res: Response) => {
     try {
-        // Prihvatamo i chatId i conversationId (frontend šalje conversationId)
         const { 
             chatId: chatIdFromBody, 
             conversationId, 
@@ -20,43 +19,24 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
             fileName 
         } = req.body;
         
-        // Koristi šta god da je poslato
         const chatId = chatIdFromBody || conversationId;
         const senderId = req.user!.id;
 
-        console.log('📩 [SEND MESSAGE] Request:', { 
-            chatId, 
-            senderId, 
-            content: content?.substring(0, 50), 
-            type,
-            hasFile: !!fileUrl 
-        });
-
-        // Validacija
-        if (!chatId) {
-            console.log('❌ [SEND MESSAGE] Missing chatId');
-            return res.status(400).json({ message: 'chatId or conversationId is required' });
-        }
-
-        if (!content || !content.trim()) {
-            console.log('❌ [SEND MESSAGE] Missing content');
-            return res.status(400).json({ message: 'Message content is required' });
+        if (!chatId || !content || !content.trim()) {
+            return res.status(400).json({ message: 'Missing chatId or content' });
         }
 
         const messageRepository = AppDataSource.getRepository(Message);
         const membershipRepository = AppDataSource.getRepository(ChatMembership);
 
-        // Proveri da li je korisnik član chata
         const membership = await membershipRepository.findOne({
             where: { chatId, userId: senderId },
         });
 
         if (!membership) {
-            console.log('❌ [SEND MESSAGE] User not member of chat');
             return res.status(403).json({ message: 'Not a member of this chat' });
         }
 
-        // Kreiraj poruku
         const message = messageRepository.create({
             chatId,
             senderId,
@@ -67,21 +47,29 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         });
 
         await messageRepository.save(message);
-        console.log('✅ [SEND MESSAGE] Message created:', message.id);
 
-        // Učitaj poruku sa sender relacijom
         const savedMessage = await messageRepository.findOne({
             where: { id: message.id },
             relations: ['sender'],
         });
 
-        console.log('✅ [SEND MESSAGE] Message saved with sender:', savedMessage?.id);
+        // 🔥 KLJUČNI DEO ZA REAL-TIME:
+        // Preko req.app.get dohvataš 'io' instancu koju si setovao u server.ts ili app.ts
+        const io = req.app.get('io');
+        if (io && savedMessage) {
+            // Emitujemo poruku u "sobu" koja se zove isto kao chatId
+            // Frontend u ChatWindow sluša 'message:new'
+            io.to(chatId).emit('message:new', {
+                ...savedMessage,
+                conversationId: chatId // Dodajemo conversationId jer frontend to očekuje u handleNewMessage
+            });
+            console.log(`📡 [SOCKET] Message emitted to room: ${chatId}`);
+        }
 
         return res.status(201).json(savedMessage);
     } catch (error: any) {
         console.error('❌ [SEND MESSAGE] Error:', error.message);
-        console.error(error.stack);
-        return res.status(500).json({ message: 'Server error', error: error.message });
+        return res.status(500).json({ message: 'Server error' });
     }
 };
 

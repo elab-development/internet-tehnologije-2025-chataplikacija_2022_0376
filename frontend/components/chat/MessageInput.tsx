@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Smile, X } from 'lucide-react';
+import EmojiPicker, { Theme } from 'emoji-picker-react';
 import Button from '../../components/ui/Button';
 import { cn } from '../../lib/utils';
 
@@ -20,24 +21,42 @@ export default function MessageInput({
 }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
+  // Zatvori emoji picker ako klikneš van njega
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
     if (editingMessage) {
       setMessage(editingMessage.content);
       textareaRef.current?.focus();
     }
   }, [editingMessage]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     
     if (!message.trim() && !selectedFile) return;
 
-    onSendMessage(message, selectedFile || undefined);
+    // Slanje podataka roditeljskoj komponenti (ChatWindow)
+    onSendMessage(message.trim(), selectedFile || undefined);
+    
+    // Resetovanje inputa
     setMessage('');
     setSelectedFile(null);
+    setShowEmojiPicker(false);
     
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -47,68 +66,68 @@ export default function MessageInput({
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      handleSubmit();
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-    }
+  const onEmojiClick = (emojiData: any) => {
+    setMessage((prev) => prev + emojiData.emoji);
+    textareaRef.current?.focus();
   };
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
-    
     e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+    e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
   };
 
   return (
-    <div className="border-t border-dark-200 bg-white p-4">
-      {}
+    <div className="border-t border-gray-200 bg-white p-4 relative">
+      {/* Emoji Picker Popup */}
+      {showEmojiPicker && (
+        <div ref={pickerRef} className="absolute bottom-20 right-4 z-50 shadow-2xl">
+          <EmojiPicker 
+            onEmojiClick={onEmojiClick} 
+            theme={Theme.LIGHT}
+            autoFocusSearch={false}
+          />
+        </div>
+      )}
+
+      {/* Edit Mode Indicator */}
       {editingMessage && (
-        <div className="mb-2 flex items-center justify-between bg-primary-50 px-3 py-2 rounded-lg">
-          <span className="text-sm text-primary-700">
-            Izmena poruke
+        <div className="mb-2 flex items-center justify-between bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
+          <span className="text-sm text-blue-700 flex items-center gap-2">
+            <span className="font-semibold">Izmena poruke:</span> {editingMessage.content.substring(0, 50)}...
           </span>
-          <button
-            onClick={onCancelEdit}
-            className="text-primary-700 hover:text-primary-800"
-          >
+          <button onClick={onCancelEdit} className="text-blue-700 hover:text-blue-900">
             <X size={16} />
           </button>
         </div>
       )}
 
-      {}
+      {/* File Preview */}
       {selectedFile && (
-        <div className="mb-2 flex items-center justify-between bg-dark-50 px-3 py-2 rounded-lg">
+        <div className="mb-2 flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-primary-100 flex items-center justify-center">
+            <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center text-lg">
               📎
             </div>
-            <span className="text-sm text-dark-700 truncate max-w-[200px]">
+            <span className="text-sm text-gray-700 truncate max-w-[200px]">
               {selectedFile.name}
             </span>
           </div>
-          <button
-            onClick={() => setSelectedFile(null)}
-            className="text-dark-600 hover:text-dark-800"
-          >
-            <X size={16} />
+          <button onClick={() => setSelectedFile(null)} className="text-gray-500 hover:text-red-500">
+            <X size={18} />
           </button>
         </div>
       )}
 
-      
-      <form onSubmit={handleSubmit} className="flex items-end gap-2">
-        {}
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 max-w-7xl mx-auto">
         <input
           ref={fileInputRef}
           type="file"
-          onChange={handleFileSelect}
+          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
           className="hidden"
           accept="image/*,.pdf,.doc,.docx,.txt"
         />
@@ -116,50 +135,49 @@ export default function MessageInput({
         <Button
           type="button"
           variant="ghost"
-          size="sm"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          className="flex-shrink-0"
+          className="flex-shrink-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
         >
-          <Paperclip size={20} />
+          <Paperclip size={22} />
         </Button>
 
-        {/* Text  */}
         <div className="flex-1 relative">
           <textarea
             ref={textareaRef}
             value={message}
             onChange={handleTextareaChange}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             placeholder="Napišite poruku..."
             disabled={disabled}
             rows={1}
             className={cn(
-              'w-full px-4 py-2.5 pr-12 rounded-lg border border-dark-300 bg-white',
-              'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-              'placeholder:text-dark-400 text-dark-900 resize-none',
-              'disabled:bg-dark-100 disabled:cursor-not-allowed'
+              'w-full px-4 py-3 pr-12 rounded-2xl border border-gray-200 bg-gray-50',
+              'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all',
+              'placeholder:text-gray-400 text-gray-900 resize-none min-h-[46px]',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           />
           
-          {/* Emoji  */}
           <button
             type="button"
-            className="absolute right-3 bottom-3 text-dark-400 hover:text-dark-600"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className={cn(
+              "absolute right-3 bottom-3 transition-colors",
+              showEmojiPicker ? "text-blue-600" : "text-gray-400 hover:text-gray-600"
+            )}
           >
-            <Smile size={20} />
+            <Smile size={22} />
           </button>
         </div>
 
-        {/* Send Button */}
         <Button
           type="submit"
           variant="primary"
-          size="sm"
           disabled={disabled || (!message.trim() && !selectedFile)}
-          className="flex-shrink-0 w-10 h-10 p-0 rounded-full"
+          className="flex-shrink-0 w-11 h-11 p-0 rounded-full shadow-md hover:shadow-lg transition-all"
         >
-          <Send size={18} />
+          <Send size={20} className="ml-0.5" />
         </Button>
       </form>
     </div>
