@@ -68,4 +68,8 @@ AppDataSource.initialize()
     console.error(error);
   });
 
+  // server.ts
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', authRoutes); // Dodaj ovo - sada authRoutes reaguje i na /api/admin
+
 export default app;

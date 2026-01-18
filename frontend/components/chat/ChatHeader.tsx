@@ -13,6 +13,11 @@ interface ChatHeaderProps {
   onOpenInfo: () => void;
 }
 
+// Pomoćna funkcija za klase
+function cn(...classes: any[]) {
+  return classes.filter(Boolean).join(' ');
+}
+
 export default function ChatHeader({
   conversation,
   currentUser,
@@ -20,7 +25,8 @@ export default function ChatHeader({
   onOpenInfo,
 }: ChatHeaderProps) {
   const isGroup = conversation.type === 'group';
-  // Nalazimo onog ko NIJE ulogovan korisnik
+  
+  // Sagovornik je onaj koji nije trenutni korisnik
   const otherParticipant = conversation.participants.find(p => p.id !== currentUser.id);
   
   const displayName = isGroup
@@ -30,17 +36,17 @@ export default function ChatHeader({
     : 'Korisnik';
 
   return (
-    <div className="h-[70px] bg-white border-b border-gray-200 flex items-center justify-between px-4 z-10 shadow-sm">
+    <div className="h-[70px] bg-white border-b border-gray-200 flex items-center justify-between px-4 z-10">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {onBack && (
-          <Button variant="ghost" size="sm" onClick={onBack} className="lg:hidden">
-            <ArrowLeft size={20} />
+          <Button variant="ghost" size="sm" onClick={onBack} className="lg:hidden p-1 -ml-2">
+            <ArrowLeft size={22} className="text-gray-600" />
           </Button>
         )}
 
         <div className="flex items-center gap-3 cursor-pointer" onClick={onOpenInfo}>
           {isGroup ? (
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
               <Users size={20} className="text-blue-600" />
             </div>
           ) : (
@@ -53,7 +59,7 @@ export default function ChatHeader({
             />
           )}
 
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0">
             <h2 className="font-bold text-gray-900 text-sm truncate leading-tight">
               {displayName}
             </h2>
@@ -63,29 +69,24 @@ export default function ChatHeader({
             )}>
               {isGroup 
                 ? `${conversation.participants.length} učesnika` 
-                : otherParticipant?.isOnline ? 'Aktivan' : 'Van mreže'}
+                : otherParticipant?.isOnline ? 'Aktivan/na na mreži' : 'Van mreže'}
             </p>
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-1">
-        <Button variant="ghost" className="text-blue-600 hover:bg-blue-50 rounded-full p-2">
+        <Button variant="ghost" className="text-blue-600 hover:bg-blue-50 rounded-full w-10 h-10 p-0">
           <Video size={20} />
         </Button>
-        <Button variant="ghost" className="text-blue-600 hover:bg-blue-50 rounded-full p-2">
+        <Button variant="ghost" className="text-blue-600 hover:bg-blue-50 rounded-full w-10 h-10 p-0">
           <Phone size={20} />
         </Button>
         <div className="w-[1px] h-6 bg-gray-200 mx-1" />
-        <Button variant="ghost" onClick={onOpenInfo} className="text-gray-400 hover:bg-gray-100 rounded-full p-2">
+        <Button variant="ghost" onClick={onOpenInfo} className="text-gray-400 hover:bg-gray-100 rounded-full w-10 h-10 p-0">
           <MoreVertical size={20} />
         </Button>
       </div>
     </div>
   );
-}
-
-// Pomoćna funkcija unutar fajla ili importovana
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

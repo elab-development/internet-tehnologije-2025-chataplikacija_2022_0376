@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Users, MessageCircle } from 'lucide-react';
 import axios from '../../lib/axios';
-import { Conversation, Message } from '../../types/types';
+import { Conversation, Message, User } from '../../types/types';
 import Avatar from '../../components/ui/Avatar';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
@@ -15,12 +15,14 @@ interface ChatListProps {
   selectedConversationId?: string;
   onSelectConversation: (conversationId: string) => void;
   onNewChat: () => void;
+  currentUser: User; // Dodat prop za ispravnu identifikaciju
 }
 
 export default function ChatList({
   selectedConversationId,
   onSelectConversation,
   onNewChat,
+  currentUser
 }: ChatListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,29 +33,25 @@ export default function ChatList({
     fetchConversations();
   }, []);
 
-  // SOCKET: Slušanje novih poruka za ažuriranje liste sa strane
   useEffect(() => {
     if (!socket) return;
 
     const handleNewMessageUpdateList = (message: Message) => {
       setConversations((prev) => {
-        // 1. Pronađi konverzaciju kojoj pripada poruka
-        const convIndex = prev.findIndex(c => c.id === message.conversationId || c.id === message.conversationId);
+        const convId = message.conversationId || (message as any).conversationId;
+        const convIndex = prev.findIndex(c => c.id === convId);
         
-        if (convIndex === -1) return prev; // Ako nije u listi, ne radi ništa 
+        if (convIndex === -1) return prev; 
 
         const updatedConversations = [...prev];
         const conversation = { ...updatedConversations[convIndex] };
 
-        // 2. Ažuriraj poslednju poruku
         conversation.lastMessage = message;
         
-        // 3. Povećaj unreadCount ako čat nije trenutno selektovan
         if (conversation.id !== selectedConversationId) {
           conversation.unreadCount = (conversation.unreadCount || 0) + 1;
         }
 
-        // 4. Izbaci staru verziju i stavi osveženu na prvo mesto (vrh liste)
         updatedConversations.splice(convIndex, 1);
         return [conversation, ...updatedConversations];
       });
@@ -78,95 +76,103 @@ export default function ChatList({
   };
 
   const filteredConversations = conversations.filter((conv) => {
-    if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
-    const conversationName = conv.name || 
-      conv.participants.map(p => `${p.firstName} ${p.lastName}`).join(', ');
-    return conversationName.toLowerCase().includes(searchLower);
+    const otherParticipant = conv.participants.find(p => p.id !== currentUser.id);
+    const displayName = conv.type === 'group' 
+      ? conv.name 
+      : `${otherParticipant?.firstName} ${otherParticipant?.lastName}`;
+    
+    return displayName?.toLowerCase().includes(searchLower);
   });
 
   return (
-    <div className="h-full flex flex-col bg-white border-r border-dark-200">
-      <div className="p-4 border-b border-dark-200">
+    <div className="h-full flex flex-col bg-white border-r border-gray-200">
+      <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-dark-900">Chatovi</h2>
-          <Button variant="primary" size="sm" onClick={onNewChat} className="rounded-full w-10 h-10 p-0">
-            <Plus size={20} />
+          <h2 className="text-xl font-bold text-gray-900">Poruke</h2>
+          <Button variant="primary" size="sm" onClick={onNewChat} className="rounded-full w-9 h-9 p-0">
+            <Plus size={18} />
           </Button>
         </div>
         <Input
-          placeholder="Pretraži..."
+          placeholder="Pretraži razgovore..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          icon={<Search size={18} />}
-          className="bg-dark-50"
+          icon={<Search size={16} />}
+          className="bg-gray-50 border-none"
         />
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
           </div>
         ) : filteredConversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-dark-400 px-4 text-center">
-            <MessageCircle size={48} className="mb-4 opacity-50" />
-            <p>Nema konverzacija</p>
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 px-4 text-center">
+            <MessageCircle size={40} className="mb-2 opacity-20" />
+            <p className="text-sm">Nema pronađenih čatova</p>
           </div>
         ) : (
-          <div className="divide-y divide-dark-100">
+          <div className="divide-y divide-gray-50">
             {filteredConversations.map((conversation) => {
               const isGroup = conversation.type === 'group';
-              // Filtriramo sebe iz učesnika da dobijemo "drugog"
-              const otherParticipant = conversation.participants.find(p => p.id !== socket?.id); 
-              // Napomena: Ako socket?.id ne radi, koristi currentUser.id ako ga proslediš kao prop
+              const otherParticipant = conversation.participants.find(p => p.id !== currentUser.id);
               
               const displayName = isGroup 
                 ? conversation.name 
-                : `${conversation.participants[0]?.firstName} ${conversation.participants[0]?.lastName}`;
+                : otherParticipant 
+                  ? `${otherParticipant.firstName} ${otherParticipant.lastName}`
+                  : 'Korisnik';
 
               return (
                 <div
                   key={conversation.id}
                   onClick={() => onSelectConversation(conversation.id)}
                   className={cn(
-                    'flex items-center gap-3 p-4 cursor-pointer transition-colors hover:bg-gray-50',
-                    conversation.id === selectedConversationId && 'bg-blue-50 hover:bg-blue-50'
+                    'flex items-center gap-3 p-4 cursor-pointer transition-all hover:bg-gray-50',
+                    conversation.id === selectedConversationId && 'bg-blue-50'
                   )}
                 >
                   <div className="relative">
                     {isGroup ? (
-                      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                        <Users size={24} className="text-blue-600" />
+                      <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
+                        <Users size={20} className="text-blue-600" />
                       </div>
                     ) : (
                       <Avatar
-                        src={conversation.participants[0]?.avatar}
-                        firstName={conversation.participants[0]?.firstName}
-                        lastName={conversation.participants[0]?.lastName}
-                        size="lg"
-                        online={conversation.participants[0]?.isOnline}
+                        src={otherParticipant?.avatar}
+                        firstName={otherParticipant?.firstName}
+                        lastName={otherParticipant?.lastName}
+                        size="md"
+                        online={otherParticipant?.isOnline}
                       />
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-semibold text-dark-900 truncate text-sm">{displayName}</h3>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <h3 className={cn(
+                        "font-semibold text-sm truncate",
+                        conversation.unreadCount ? "text-gray-900" : "text-gray-700"
+                      )}>{displayName}</h3>
                       {conversation.lastMessage && (
-                        <span className="text-[10px] text-gray-500 flex-shrink-0">
+                        <span className="text-[10px] text-gray-400">
                           {formatMessageTime(conversation.lastMessage.createdAt)}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-500 truncate pr-2">
+                      <p className={cn(
+                        "text-xs truncate pr-2",
+                        conversation.unreadCount ? "text-blue-600 font-medium" : "text-gray-500"
+                      )}>
                         {conversation.lastMessage
-                          ? truncateText(conversation.lastMessage.content, 30)
-                          : 'Započnite razgovor'}
+                          ? truncateText(conversation.lastMessage.content, 35)
+                          : 'Nova konverzacija'}
                       </p>
                       {conversation.unreadCount ? (
-                        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
+                        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1.5 flex items-center justify-center">
                           {conversation.unreadCount}
                         </span>
                       ) : null}

@@ -5,18 +5,21 @@ import { Chat, ChatType } from '../entities/Chat';
 import { ChatMembership, MemberRole } from '../entities/ChatMembership';
 import { User } from '../entities/User';
 
-
-// Pomoćna fja za formatiranje četa 
+// 1. KLJUČNA IZMENA: Helper funkcija sada ubacuje i rolu u grupi
 const formatChatResponse = (chat: any) => {
   if (!chat) return null;
   return {
     ...chat,
-    participants: chat.memberships ? chat.memberships.map((m: any) => m.user) : [],
+    // Mapiramo participants tako da zadržimo User podatke, ali dodamo i chatRole iz membership-a
+    participants: chat.memberships 
+      ? chat.memberships.map((m: any) => ({
+          ...m.user,      // Kopiramo sva polja iz User entiteta (id, firstName, lastName...)
+          chatRole: m.role // DODAJEMO rolu specifičnu za ovaj chat (admin/member)
+        })) 
+      : [],
     messages: chat.messages || []
   };
 };
-
-
 
 export const createPrivateChat = async (req: AuthRequest, res: Response) => {
   try {
@@ -25,7 +28,6 @@ export const createPrivateChat = async (req: AuthRequest, res: Response) => {
     const chatRepository = AppDataSource.getRepository(Chat);
     const membershipRepository = AppDataSource.getRepository(ChatMembership);
 
-    // 1. Provera da li chat već postoji
     const existingMemberships = await membershipRepository
       .createQueryBuilder('membership')
       .innerJoin('membership.chat', 'chat')
@@ -51,10 +53,7 @@ export const createPrivateChat = async (req: AuthRequest, res: Response) => {
       return res.json(formatChatResponse(existingChat));
     }
 
-    // 2. Kreiranje novog privatnog četa
-    const chat = chatRepository.create({ 
-        type: ChatType.PRIVATE 
-    });
+    const chat = chatRepository.create({ type: ChatType.PRIVATE });
     await chatRepository.save(chat);
 
     const membership1 = membershipRepository.create({
@@ -97,14 +96,14 @@ export const createGroupChat = async (req: AuthRequest, res: Response) => {
     });
     await chatRepository.save(chat);
 
-    // (onaj ko kreira)
+    // Kreator je ADMIN
     const adminMembership = membershipRepository.create({
       chatId: chat.id,
       userId: currentUserId,
       role: MemberRole.ADMIN,
     });
 
-    // Ostali članovi
+    // Ostali su MEMBERS
     const otherMemberships = participantIds.map((userId: string) =>
       membershipRepository.create({
         chatId: chat.id,
@@ -170,12 +169,64 @@ export const getChatById = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const addMemberToGroup = async (req: AuthRequest, res: Response) => {
+  try {
+    const { chatId, email } = req.body; // Korisnika tražimo po emailu
+    const currentUserId = req.user!.id;
+
+    const membershipRepository = AppDataSource.getRepository(ChatMembership);
+    const userRepository = AppDataSource.getRepository(User);
+    const chatRepository = AppDataSource.getRepository(Chat);
+
+    const currentUserMembership = await membershipRepository.findOne({
+      where: { chatId, userId: currentUserId },
+    });
+
+    if (!currentUserMembership || (currentUserMembership.role !== MemberRole.ADMIN && currentUserMembership.role !== MemberRole.MODERATOR)) {
+      return res.status(403).json({ message: 'Nemate dozvolu za dodavanje članova.' });
+    }
+
+    const userToAdd = await userRepository.findOne({ where: { email } });
+    if (!userToAdd) {
+      return res.status(404).json({ message: 'Korisnik sa tim emailom ne postoji.' });
+    }
+
+    const existingMembership = await membershipRepository.findOne({
+      where: { chatId, userId: userToAdd.id }
+    });
+
+    if (existingMembership) {
+      return res.status(400).json({ message: 'Korisnik je već u grupi.' });
+    }
+
+    const newMembership = membershipRepository.create({
+      chatId,
+      userId: userToAdd.id,
+      role: MemberRole.MEMBER,
+    });
+
+    await membershipRepository.save(newMembership);
+
+    const updatedChat = await chatRepository.findOne({
+      where: { id: chatId },
+      relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
+    });
+
+    return res.json(formatChatResponse(updatedChat));
+  } catch (error) {
+    console.error('Add member error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// --- FUNKCIJA: Izbacivanje člana ---
 export const removeMemberFromGroup = async (req: AuthRequest, res: Response) => {
   try {
-    const { chatId, userId } = req.body;
+    const { chatId, userId } = req.body; // userId onoga koga izbacujemo
     const currentUserId = req.user!.id;
     const membershipRepository = AppDataSource.getRepository(ChatMembership);
-
+    
+    // 1. Provera: Ko si ti?
     const currentUserMembership = await membershipRepository.findOne({
       where: { chatId, userId: currentUserId },
     });
@@ -185,10 +236,12 @@ export const removeMemberFromGroup = async (req: AuthRequest, res: Response) => 
       (currentUserMembership.role !== MemberRole.MODERATOR &&
         currentUserMembership.role !== MemberRole.ADMIN)
     ) {
-      return res.status(403).json({ message: 'Insufficient permissions' });
+      return res.status(403).json({ message: 'Nemate dozvolu za izbacivanje.' });
     }
 
+    // 2. Obriši membership onoga koga izbacujemo
     await membershipRepository.delete({ chatId, userId });
+    
     return res.json({ message: 'Member removed successfully' });
   } catch (error) {
     console.error('Remove member error:', error);

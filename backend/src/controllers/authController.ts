@@ -311,4 +311,67 @@ export const changePassword = async (req: Request, res: Response) => {
     console.error('❌ [CHANGE PASSWORD] Error:', error.message);
     res.status(500).json({ message: 'Greška na serveru' });
   }
+
+};
+
+// Dodaj ove funkcije na kraj authController.ts
+
+// ---------------------- ADMIN: GET ALL USERS ----------------------
+export const getAllUsers = async (req: Request, res: Response) => {
+  try {
+    const userRepo = AppDataSource.getRepository(User);
+    // Uzimamo sve korisnike, sortirane tako da admini budu na vrhu
+    const users = await userRepo.find({
+      order: { createdAt: 'DESC' }
+    });
+
+    // Mapiramo podatke da ne šaljemo lozinke
+    const safeUsers = users.map(user => ({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      status: user.status,
+      suspendedUntil: user.suspendedUntil,
+      isOnline: user.isOnline,
+      createdAt: user.createdAt
+    }));
+
+    res.json(safeUsers);
+  } catch (error: any) {
+    console.error('❌ [ADMIN GET USERS] Error:', error.message);
+    res.status(500).json({ message: 'Greška pri učitavanju korisnika' });
+  }
+};
+
+// ---------------------- ADMIN: UPDATE USER STATUS ----------------------
+export const updateUserStatus = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, suspendedUntil, suspensionReason } = req.body;
+
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOne({ where: { id } });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Korisnik nije pronađen' });
+    }
+
+    // Sprečavamo da admin suspenduje samog sebe ili druge admine (opciono)
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Ne možete menjati status admin nalogu' });
+    }
+
+    user.status = status;
+    user.suspendedUntil = suspendedUntil ? new Date(suspendedUntil) : undefined;
+    user.suspensionReason = suspensionReason || null;
+
+    await userRepo.save(user);
+
+    res.json({ message: 'Status korisnika je ažuriran', user });
+  } catch (error: any) {
+    console.error('❌ [ADMIN UPDATE STATUS] Error:', error.message);
+    res.status(500).json({ message: 'Greška pri ažuriranju statusa' });
+  }
 };

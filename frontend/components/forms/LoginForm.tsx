@@ -73,23 +73,23 @@ export default function LoginForm() {
                 {/* Zapamti me i Zaboravili lozinku */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                        <input 
-                            type="checkbox" 
-                            style={{ 
-                                width: '16px', 
-                                height: '16px', 
+                        <input
+                            type="checkbox"
+                            style={{
+                                width: '16px',
+                                height: '16px',
                                 borderRadius: '4px',
                                 marginRight: '8px',
                                 accentColor: '#2563eb'
-                            }} 
+                            }}
                         />
                         <span style={{ fontSize: '14px', color: '#4b5563' }}>Zapamti me</span>
                     </label>
-                    <Link 
-                        href="/forgot-password" 
-                        style={{ 
-                            fontSize: '14px', 
-                            color: '#2563eb', 
+                    <Link
+                        href="/forgot-password"
+                        style={{
+                            fontSize: '14px',
+                            color: '#2563eb',
                             textDecoration: 'none',
                             fontWeight: '500'
                         }}
@@ -135,9 +135,9 @@ export default function LoginForm() {
                 >
                     {isLoading ? (
                         <>
-                            <svg 
-                                style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }} 
-                                fill="none" 
+                            <svg
+                                style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }}
+                                fill="none"
                                 viewBox="0 0 24 24"
                             >
                                 <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -153,15 +153,38 @@ export default function LoginForm() {
                     )}
                 </button>
 
+                {/* ADMIN PANEL DUGME */}
+                <Link href="/admin" style={{ textDecoration: 'none' }}>
+                    <button
+                        type="button"
+                        style={{
+                            width: '100%',
+                            padding: '12px',
+                            backgroundColor: '#e5e7eb',
+                            color: '#111827',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '10px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            marginTop: '12px'
+                        }}
+                    >
+                        Admin panel
+                    </button>
+                </Link>
+
+
+
                 {/* Link ka registraciji */}
                 <p style={{ textAlign: 'center', color: '#6b7280', marginTop: '16px' }}>
                     Nemate nalog?{' '}
-                    <Link 
-                        href="/register" 
-                        style={{ 
-                            color: '#2563eb', 
-                            fontWeight: '600', 
-                            textDecoration: 'none' 
+                    <Link
+                        href="/register"
+                        style={{
+                            color: '#2563eb',
+                            fontWeight: '600',
+                            textDecoration: 'none'
                         }}
                     >
                         Registrujte se

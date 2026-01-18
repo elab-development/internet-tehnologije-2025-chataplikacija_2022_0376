@@ -140,60 +140,41 @@ export const getChatMessages = async (req: AuthRequest, res: Response) => {
  * Izmeni postojeću poruku
  * PUT /api/messages/:messageId
  */
+// ... (ostali importi)
+
 export const editMessage = async (req: AuthRequest, res: Response) => {
     try {
         const { messageId } = req.params;
         const { content } = req.body;
         const userId = req.user!.id;
 
-        console.log('✏️ [EDIT MESSAGE] Request:', { messageId, userId });
-
-        if (!content || !content.trim()) {
-            return res.status(400).json({ message: 'Message content is required' });
-        }
-
         const messageRepository = AppDataSource.getRepository(Message);
+        const message = await messageRepository.findOne({ where: { id: messageId } });
 
-        const message = await messageRepository.findOne({
-            where: { id: messageId },
-        });
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+        if (message.senderId !== userId) return res.status(403).json({ message: 'Unauthorized' });
 
-        if (!message) {
-            console.log('❌ [EDIT MESSAGE] Message not found');
-            return res.status(404).json({ message: 'Message not found' });
-        }
-
-        if (message.senderId !== userId) {
-            console.log('❌ [EDIT MESSAGE] Unauthorized');
-            return res.status(403).json({ message: 'Not authorized to edit this message' });
-        }
-
-        // Izmeni poruku
         message.content = content.trim();
         message.isEdited = true;
         await messageRepository.save(message);
 
-        // Vrati poruku sa sender relacijom
         const updatedMessage = await messageRepository.findOne({
             where: { id: messageId },
             relations: ['sender'],
         });
 
-        // 🔥 EMIT IZMENJENU PORUKU KROZ SOCKET
         const io = req.app.get('io');
         if (io && updatedMessage) {
-            io.to(message.chatId).emit('message:edited', {
+            // PROMENJENO: message:updated umesto message:edited
+            io.to(message.chatId).emit('message:updated', {
                 ...updatedMessage,
                 conversationId: message.chatId
             });
-            console.log('📡 [SOCKET] Message edit emitted to room:', message.chatId);
         }
 
-        console.log('✅ [EDIT MESSAGE] Message updated:', messageId);
         return res.json(updatedMessage);
     } catch (error: any) {
-        console.error('❌ [EDIT MESSAGE] Error:', error.message);
-        return res.status(500).json({ message: 'Server error', error: error.message });
+        return res.status(500).json({ message: 'Server error' });
     }
 };
 
@@ -201,52 +182,36 @@ export const editMessage = async (req: AuthRequest, res: Response) => {
  * Obriši poruku
  * DELETE /api/messages/:messageId
  */
+
 export const deleteMessage = async (req: AuthRequest, res: Response) => {
     try {
         const { messageId } = req.params;
         const userId = req.user!.id;
 
-        console.log('🗑️ [DELETE MESSAGE] Request:', { messageId, userId });
-
         const messageRepository = AppDataSource.getRepository(Message);
+        const message = await messageRepository.findOne({ where: { id: messageId } });
 
-        const message = await messageRepository.findOne({
-            where: { id: messageId },
-        });
+        if (!message) return res.status(404).json({ message: 'Message not found' });
+        if (message.senderId !== userId) return res.status(403).json({ message: 'Unauthorized' });
 
-        if (!message) {
-            console.log('❌ [DELETE MESSAGE] Message not found');
-            return res.status(404).json({ message: 'Message not found' });
-        }
-
-        if (message.senderId !== userId) {
-            console.log('❌ [DELETE MESSAGE] Unauthorized');
-            return res.status(403).json({ message: 'Not authorized to delete this message' });
-        }
-
-        // Soft delete
         message.isDeleted = true;
-        message.content = 'This message has been deleted';
+        message.content = 'Ova poruka je obrisana';
         await messageRepository.save(message);
 
-        // 🔥 EMIT BRISANJE PORUKE KROZ SOCKET
         const io = req.app.get('io');
         if (io) {
-            io.to(message.chatId).emit('message:deleted', {
-                id: messageId,
-                chatId: message.chatId,
-                conversationId: message.chatId
-            });
-            console.log('📡 [SOCKET] Message deletion emitted to room:', message.chatId);
+            // Šaljemo ID obrisane poruke sobi
+            io.to(message.chatId).emit('message:deleted', messageId);
         }
 
-        console.log('✅ [DELETE MESSAGE] Message deleted:', messageId);
         return res.json({ message: 'Message deleted successfully' });
     } catch (error: any) {
-        console.error('❌ [DELETE MESSAGE] Error:', error.message);
-        return res.status(500).json({ message: 'Server error', error: error.message });
+        return res.status(500).json({ message: 'Server error' });
     }
 };
+
+
+
 
 /**
  * Pretraži poruke u chatu

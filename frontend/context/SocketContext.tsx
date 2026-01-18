@@ -18,11 +18,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
 
   useEffect(() => {
-    console.log('🔄 SocketProvider effect, user:', user?.email);
-
+    // Ako nema ulogovanog korisnika, ugasi postojeći socket
     if (!user) {
       if (socket) {
-        console.log('🔌 Disconnecting socket (no user)...');
         socket.disconnect();
         setSocket(null);
         setConnected(false);
@@ -30,19 +28,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Get token from cookie
+    // Uzmi token direktno iz kolačića
     const token = Cookies.get('auth_token');
     
     if (!token) {
-      console.error('❌ No auth token found in cookies');
+      console.warn('⚠️ Socket: Token nije pronađen u kolačićima još uvek.');
       return;
     }
 
-    console.log('🔌 Connecting to socket with token...');
-    
     const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
-    
-    console.log('🔌 Socket URL:', socketUrl);
 
     const newSocket = io(socketUrl, {
       auth: { token },
@@ -51,26 +45,25 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
 
     newSocket.on('connect', () => {
-      console.log('✅ Socket connected:', newSocket.id);
+      console.log('✅ Socket povezan:', newSocket.id);
       setConnected(true);
     });
 
     newSocket.on('disconnect', (reason) => {
-      console.log('🔌 Socket disconnected:', reason);
+      console.log('🔌 Socket diskonektovan:', reason);
       setConnected(false);
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('❌ Socket connection error:', error.message);
+      console.error('❌ Socket greška pri konekciji:', error.message);
     });
 
     setSocket(newSocket);
 
     return () => {
-      console.log('🔌 Cleaning up socket...');
       newSocket.disconnect();
     };
-  }, [user]);
+  }, [user]); // Re-run kada se user promeni (logovanje/izlogovanje)
 
   return (
     <SocketContext.Provider value={{ socket, connected }}>
