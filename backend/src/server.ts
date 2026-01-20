@@ -70,6 +70,6 @@ AppDataSource.initialize()
 
   // server.ts
 app.use('/api/auth', authRoutes);
-app.use('/api/admin', authRoutes); // Dodaj ovo - sada authRoutes reaguje i na /api/admin
+app.use('/api/admin', authRoutes); 
 
 export default app;

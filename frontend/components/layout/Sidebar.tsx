@@ -38,12 +38,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       roles: ['ADMIN', 'MODERATOR'],
     },
     {
-      name: 'Prijave',
-      href: '/admin/reports',
-      icon: AlertTriangle,
-      roles: ['ADMIN', 'MODERATOR'],
-    },
-    {
       name: 'Admin Panel',
       href: '/admin',
       icon: Shield,

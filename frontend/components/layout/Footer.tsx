@@ -34,20 +34,7 @@ export default function Footer() {
               <Github size={20} />
             </a>
           </div>
-        </div>
-
-        {/* Team Info */}
-        <div className="mt-4 pt-4 border-t border-dark-200">
-          <div className="text-center text-xs text-dark-500">
-            <p className="mb-2">Univerzitet u Beogradu - Fakultet organizacionih nauka</p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <span>Jovana Grujić (2022/0376)</span>
-              <span>•</span>
-              <span>Ana Dobrijević (2022/0032)</span>
-              <span>•</span>
-              <span>Milica Gojković (2022/0124)</span>
-            </div>
-          </div>
+        
         </div>
       </div>
     </footer>

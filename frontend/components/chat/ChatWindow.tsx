@@ -257,7 +257,7 @@ export default function ChatWindow({
                         {isUserAdmin && <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1"><Shield size={10}/> MODERATOR</span>}
                       </div>
                     </div>
-                    {/* KANTA ZA BRISANJE - VIDI SAMO MODERATOR */}
+                    {/* VIDI SAMO MODERATOR */}
                     {amIAdmin && participant.id !== currentUser.id && (
                       <button onClick={() => handleRemoveUser(participant.id)} className="text-red-400 hover:text-red-600 p-2">
                         <Trash2 size={16} />

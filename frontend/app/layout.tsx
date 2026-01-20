@@ -5,6 +5,8 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from 'context/AuthContext';
 import { SocketProvider } from 'context/SocketContext';
 
+
+
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
