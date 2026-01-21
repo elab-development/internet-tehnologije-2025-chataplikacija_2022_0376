@@ -1,3 +1,4 @@
+// entities/Message.ts
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -14,8 +15,11 @@ import { MessageReport } from './MessageReport';
 
 export enum MessageType {
   TEXT = 'text',
+  IMAGE = 'image',
+  VIDEO = 'video',
   FILE = 'file',
   GIF = 'gif',
+  AUDIO = 'audio',
 }
 
 @Entity('messages')
@@ -44,14 +48,21 @@ export class Message {
   })
   type!: MessageType;
 
-  @Column('text')
+  @Column({ type: 'text', nullable: true })
   content!: string;
 
-  @Column({ nullable: true })
+  // ✅ Polja za fajlove
+  @Column({ type: 'text', nullable: true })
   fileUrl?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   fileName?: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  fileSize?: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  mimeType?: string;
 
   @Column({ default: false })
   isEdited!: boolean;

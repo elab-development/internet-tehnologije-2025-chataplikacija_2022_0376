@@ -15,9 +15,14 @@ export interface Message {
     id: string;
     content: string;
     senderId: string;
-    conversationId: string;
-    type: 'text' | 'file' | 'image' | 'gif';
+    conversationId: string; 
+    type: 'text' | 'file' | 'image' | 'video' | 'gif' | 'audio'; // Prošireno
+  
     fileUrl?: string;
+    fileName?: string;
+    fileSize?: string;
+    mimeType?: string;
+    
     createdAt: string;
     updatedAt?: string;
     isEdited: boolean;
