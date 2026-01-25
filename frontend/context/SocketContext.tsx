@@ -18,7 +18,6 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
 
   useEffect(() => {
-    // Ako nema ulogovanog korisnika, ugasi postojeći socket
     if (!user) {
       if (socket) {
         socket.disconnect();
@@ -28,9 +27,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Uzmi token direktno iz kolačića
     const token = Cookies.get('auth_token');
-    
     if (!token) {
       console.warn('⚠️ Socket: Token nije pronađen u kolačićima još uvek.');
       return;
@@ -63,7 +60,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     return () => {
       newSocket.disconnect();
     };
-  }, [user]); // Re-run kada se user promeni (logovanje/izlogovanje)
+  }, [user]); 
 
   return (
     <SocketContext.Provider value={{ socket, connected }}>

@@ -22,7 +22,6 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
   // Mapa za praćenje online korisnika
   const onlineUsers = new Map<string, string>(); // userId -> socketId
 
-  // ✅ DODAJ JWT AUTHENTICATION MIDDLEWARE
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
@@ -58,7 +57,6 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
       userId 
     });
 
-    // ✅ AUTOMATSKI DODAJ KORISNIKA U ONLINE LISTU
     if (userId) {
       onlineUsers.set(userId, socket.id);
       socket.join(userId); // Join personal room
@@ -66,19 +64,16 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
       io.emit('user_online', userId);
     }
 
-    // Pridruživanje konkretnom chatu (sobi)
     socket.on('join_chat', (chatId: string) => {
       socket.join(chatId);
       console.log(`🏠 User ${userId} joined chat room: ${chatId}`);
     });
 
-    // Napuštanje sobe
     socket.on('leave_chat', (chatId: string) => {
       socket.leave(chatId);
       console.log(`🚪 User ${userId} left chat room: ${chatId}`);
     });
 
-    // Indikator kucanja (Typing...)
     socket.on('typing', (chatId: string) => {
       console.log(`⌨️ User ${userId} typing in chat ${chatId}`);
       socket.to(chatId).emit('typing', { userId, chatId });
@@ -88,7 +83,6 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
       socket.to(chatId).emit('stop_typing', { userId, chatId });
     });
 
-    // Diskonekcija
     socket.on('disconnect', () => {
       if (userId) {
         onlineUsers.delete(userId);

@@ -37,22 +37,31 @@ export default function ChatPage() {
   return (
     <div className="flex h-full w-full overflow-hidden bg-white">
       {/* SIDEBAR - Lista konverzacija */}
-      {/* Klasa 'lg:flex' osigurava da je na desktopu uvek vidljiv, bez obzira na stanje */}
       <aside
         className={`${
           showChatOnMobile ? 'hidden' : 'flex'
-        } lg:flex flex-col w-full lg:w-[400px] flex-shrink-0 border-r border-gray-200 h-full bg-white overflow-y-auto`}
+        } lg:flex flex-col w-full lg:w-[400px] flex-shrink-0 border-r border-gray-200 h-full bg-white relative`} 
       >
-        <ChatList
-          currentUser={user}
-          selectedConversationId={selectedConversationId}
-          onSelectConversation={handleSelectConversation}
-          onNewChat={() => setShowNewChatModal(true)}
-        />
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <ChatList
+            currentUser={user}
+            selectedConversationId={selectedConversationId}
+            onSelectConversation={handleSelectConversation}
+            onNewChat={() => setShowNewChatModal(true)}
+          />
+        </div>
+        <div className="absolute bottom-6 right-6 lg:right-6">
+          <button
+            onClick={() => setShowNewChatModal(true)}
+            className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-90 z-50 border-2 border-white"
+            title="Novo ćaskanje"
+          >
+            <Plus size={30} strokeWidth={2.5} />
+          </button>
+        </div>
       </aside>
 
       {/* MAIN - Chat prozor */}
-      {/* Klasa 'lg:flex' osigurava da desna strana popuni ostatak ekrana na desktopu */}
       <main
         className={`${
           !showChatOnMobile ? 'hidden' : 'flex'
@@ -68,7 +77,6 @@ export default function ChatPage() {
             }}
           />
         ) : (
-          /* Prazno stanje - vidljivo samo na desktopu kada ništa nije izabrano */
           <div className="hidden lg:flex flex-1 flex-col items-center justify-center p-12 bg-gray-50 text-center">
             <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center mb-8 shadow-xl shadow-blue-200">
               <MessageSquare size={48} color="#ffffff" strokeWidth={1.5} />

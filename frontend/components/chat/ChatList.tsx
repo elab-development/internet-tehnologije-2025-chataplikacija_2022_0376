@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Users, MessageCircle } from 'lucide-react';
+import { Search, Plus, Users, MessageCircle, Shield } from 'lucide-react';
 import axios from '../../lib/axios';
 import { Conversation, Message, User } from '../../types/types';
 import Avatar from '../../components/ui/Avatar';
@@ -15,7 +15,7 @@ interface ChatListProps {
   selectedConversationId?: string;
   onSelectConversation: (conversationId: string) => void;
   onNewChat: () => void;
-  currentUser: User; // Dodat prop za ispravnu identifikaciju
+  currentUser: User;
 }
 
 export default function ChatList({
@@ -41,12 +41,16 @@ export default function ChatList({
         const convId = message.conversationId || (message as any).conversationId;
         const convIndex = prev.findIndex(c => c.id === convId);
         
-        if (convIndex === -1) return prev; 
+        if (convIndex === -1) {
+          fetchConversations();
+          return prev;
+        } 
 
         const updatedConversations = [...prev];
         const conversation = { ...updatedConversations[convIndex] };
 
         conversation.lastMessage = message;
+        conversation.updatedAt = message.createdAt;
         
         if (conversation.id !== selectedConversationId) {
           conversation.unreadCount = (conversation.unreadCount || 0) + 1;
@@ -58,14 +62,16 @@ export default function ChatList({
     };
 
     socket.on('message:new', handleNewMessageUpdateList);
+    socket.on('chat:created', () => fetchConversations());
+
     return () => {
       socket.off('message:new', handleNewMessageUpdateList);
+      socket.off('chat:created');
     };
   }, [socket, selectedConversationId]);
 
   const fetchConversations = async () => {
     try {
-      setLoading(true);
       const response = await axios.get('/chats');
       setConversations(response.data);
     } catch (error) {
@@ -86,38 +92,41 @@ export default function ChatList({
   });
 
   return (
-    <div className="h-full flex flex-col bg-white border-r border-gray-200">
-      <div className="p-4 border-b border-gray-200">
+    <div className="h-full flex flex-col bg-white">
+      <div className="p-4 border-b border-gray-100">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Poruke</h2>
-          <Button variant="primary" size="sm" onClick={onNewChat} className="rounded-full w-9 h-9 p-0">
-            <Plus size={18} />
+          <h2 className="text-xl font-bold text-gray-900 tracking-tight">Poruke</h2>
+          <Button variant="ghost" size="sm" onClick={onNewChat} className="rounded-full w-8 h-8 p-0 hover:bg-gray-100">
+            <Plus size={18} className="text-gray-600" />
           </Button>
         </div>
-        <Input
-          placeholder="Pretraži razgovore..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          icon={<Search size={16} />}
-          className="bg-gray-50 border-none"
-        />
+        <div className="relative">
+          <Input
+            placeholder="Pretraži razgovore..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-gray-50 border-none pl-10 h-10 text-sm"
+          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+          <div className="flex items-center justify-center h-32">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />
           </div>
         ) : filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 px-4 text-center">
-            <MessageCircle size={40} className="mb-2 opacity-20" />
-            <p className="text-sm">Nema pronađenih čatova</p>
+            <MessageCircle size={32} className="mb-2 opacity-10" />
+            <p className="text-xs">Nema pronađenih čatova</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="flex flex-col">
             {filteredConversations.map((conversation) => {
               const isGroup = conversation.type === 'group';
               const otherParticipant = conversation.participants.find(p => p.id !== currentUser.id);
+              const isModerator = otherParticipant?.role?.toUpperCase() === 'MODERATOR' || otherParticipant?.role?.toUpperCase() === 'ADMIN';
               
               const displayName = isGroup 
                 ? conversation.name 
@@ -130,49 +139,56 @@ export default function ChatList({
                   key={conversation.id}
                   onClick={() => onSelectConversation(conversation.id)}
                   className={cn(
-                    'flex items-center gap-3 p-4 cursor-pointer transition-all hover:bg-gray-50',
-                    conversation.id === selectedConversationId && 'bg-blue-50'
+                    'flex items-center gap-3 p-4 cursor-pointer transition-all border-l-4 border-transparent',
+                    conversation.id === selectedConversationId 
+                      ? 'bg-blue-50/50 border-blue-600' 
+                      : 'hover:bg-gray-50'
                   )}
                 >
-                  <div className="relative">
+                  <div className="relative flex-shrink-0">
                     {isGroup ? (
-                      <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
-                        <Users size={20} className="text-blue-600" />
+                      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center ring-2 ring-white">
+                        <Users size={22} className="text-blue-600" />
                       </div>
                     ) : (
                       <Avatar
                         src={otherParticipant?.avatar}
                         firstName={otherParticipant?.firstName}
                         lastName={otherParticipant?.lastName}
-                        size="md"
+                        size="lg"
                         online={otherParticipant?.isOnline}
                       />
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <h3 className={cn(
-                        "font-semibold text-sm truncate",
-                        conversation.unreadCount ? "text-gray-900" : "text-gray-700"
-                      )}>{displayName}</h3>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className={cn(
+                          "text-sm truncate",
+                          conversation.unreadCount || !conversation.lastMessage ? "font-bold text-gray-900" : "font-medium text-gray-700"
+                        )}>{displayName}</h3>
+                        {!isGroup && isModerator && (
+                          <Shield size={12} className="text-blue-600 fill-blue-50 flex-shrink-0" />
+                        )}
+                      </div>
                       {conversation.lastMessage && (
-                        <span className="text-[10px] text-gray-400">
+                        <span className="text-[10px] text-gray-400 font-medium">
                           {formatMessageTime(conversation.lastMessage.createdAt)}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center justify-between">
                       <p className={cn(
-                        "text-xs truncate pr-2",
-                        conversation.unreadCount ? "text-blue-600 font-medium" : "text-gray-500"
+                        "text-xs truncate pr-4 max-w-[180px]",
+                        conversation.unreadCount ? "text-blue-600 font-semibold" : "text-gray-500"
                       )}>
                         {conversation.lastMessage
-                          ? truncateText(conversation.lastMessage.content, 35)
+                          ? truncateText(conversation.lastMessage.content, 40)
                           : 'Nova konverzacija'}
                       </p>
                       {conversation.unreadCount ? (
-                        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1.5 flex items-center justify-center">
+                        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1.5 flex items-center justify-center shadow-sm">
                           {conversation.unreadCount}
                         </span>
                       ) : null}

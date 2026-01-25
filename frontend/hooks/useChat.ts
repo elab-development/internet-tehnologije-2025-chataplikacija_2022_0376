@@ -38,7 +38,7 @@ export function useChat(conversationId?: string) {
     }
   }, []);
 
-  // 3. ISPRAVLJENO: Učitavanje poruka (Backend ruta: GET /api/messages/chat/:chatId)
+  //  Učitavanje poruka (Backend ruta: GET /api/messages/chat/:chatId)
   const fetchMessages = useCallback(async (id: string) => {
     try {
       setLoading(true);
@@ -52,13 +52,11 @@ export function useChat(conversationId?: string) {
     }
   }, []);
 
-  // 4. ISPRAVLJENO: Slanje poruke (Usklađeno sa backend sendMessage)
+  // Slanje poruke (Usklađeno sa backend sendMessage)
   const sendMessage = useCallback(async (content: string, targetId: string, file?: File) => {
     try {
       setSending(true);
       
-      // Ako tvoj backend koristi običan JSON umesto FormDate (proveri messageController)
-      // Koristimo JSON jer je lakše ako nemaš pravi file upload setup spreman
       const response = await axios.post('/messages', {
         content,
         chatId: targetId, // Backend očekuje chatId
@@ -74,7 +72,7 @@ export function useChat(conversationId?: string) {
     }
   }, []);
 
-  // 5. ISPRAVLJENO: Kreiranje konverzacije (Backend rute: /chats/private i /chats/group)
+  //  Kreiranje konverzacije (Backend rute: /chats/private i /chats/group)
   const createConversation = useCallback(async (type: 'private' | 'group', participantIds: string[], name?: string) => {
     try {
       const url = type === 'private' ? '/chats/private' : '/chats/group';

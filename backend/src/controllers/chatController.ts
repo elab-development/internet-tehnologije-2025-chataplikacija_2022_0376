@@ -5,16 +5,15 @@ import { Chat, ChatType } from '../entities/Chat';
 import { ChatMembership, MemberRole } from '../entities/ChatMembership';
 import { User } from '../entities/User';
 
-// 1. KLJUČNA IZMENA: Helper funkcija sada ubacuje i rolu u grupi
+// Fja koja ubacuje ulogu
 const formatChatResponse = (chat: any) => {
   if (!chat) return null;
   return {
     ...chat,
-    // Mapiramo participants tako da zadržimo User podatke, ali dodamo i chatRole iz membership-a
     participants: chat.memberships 
       ? chat.memberships.map((m: any) => ({
-          ...m.user,      // Kopiramo sva polja iz User entiteta (id, firstName, lastName...)
-          chatRole: m.role // DODAJEMO rolu specifičnu za ovaj chat (admin/member)
+          ...m.user,      
+          chatRole: m.role 
         })) 
       : [],
     messages: chat.messages || []

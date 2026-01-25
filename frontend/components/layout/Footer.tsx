@@ -12,7 +12,7 @@ export default function Footer() {
           <div className="flex items-center gap-2 text-sm text-dark-600">
             <span>Napravljeno sa</span>
             <Heart size={16} className="text-red-500 fill-current" />
-            <span>od strane</span>
+            <span>od</span>
             <span className="font-semibold text-dark-900">
               Jovana Grujić, Ana Dobrijević, Milica Gojković
             </span>
@@ -20,7 +20,7 @@ export default function Footer() {
 
           {/* Center Section */}
           <div className="text-sm text-dark-500">
-            © 2024 Chat Aplikacija. Sva prava zadržana.
+            © 2026 Chat Aplikacija. Sva prava zadržana.
           </div>
 
           {/* Right Section */}

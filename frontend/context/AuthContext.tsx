@@ -62,7 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.log('👤 User set after login:', response.data.user);
                 toast.success('Uspešno ste se prijavili!');
                 
-                // ✅ IZMENA: Koristi router.push umesto window.location.href
                 console.log('🔄 Redirecting to /chat...');
                 router.push('/chat');
             } else {
@@ -97,7 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.log('👤 User set after registration:', response.data.user);
                 toast.success('Uspešno ste se registrovali!');
                 
-                // ✅ IZMENA: Koristi router.push umesto window.location.href
                 console.log('🔄 Redirecting to /chat...');
                 router.push('/chat');
             } else {
