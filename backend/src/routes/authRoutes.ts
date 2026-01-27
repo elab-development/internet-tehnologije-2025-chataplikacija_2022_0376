@@ -1,3 +1,4 @@
+// routes/authRoutes.ts
 import { Router } from 'express';
 import {
     register,
@@ -7,27 +8,27 @@ import {
     forgotPassword,
     resetPassword,
     changePassword,
-    getAllUsers,
-    updateUserStatus
+    getAllUsers,        // ✅ Dodato
+    updateUserStatus,   // ✅ Dodato
 } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 import { validateRegistration, validateLogin, handleValidationErrors } from '../utils/validation';
 
 const router = Router();
 
-// --- JAVNE RUTE ---
+// Javne rute
 router.post('/register', validateRegistration, handleValidationErrors, register);
 router.post('/login', validateLogin, handleValidationErrors, login);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 
-// --- ADMIN RUTE  ---
-router.get('/admin/users', getAllUsers); 
-router.patch('/admin/users/:id/status', updateUserStatus);
-
-// --- ZAŠTIĆENE RUTE (Za obične korisnike) ---
+// Zaštićene rute
 router.get('/me', authenticate, getMe);
 router.post('/logout', authenticate, logout);
 router.post('/change-password', authenticate, changePassword);
+
+// ✅ Admin rute
+router.get('/users', authenticate, getAllUsers);
+router.post('/users/status', authenticate, updateUserStatus);
 
 export default router;

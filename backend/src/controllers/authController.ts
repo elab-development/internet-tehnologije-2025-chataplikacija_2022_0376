@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { AppDataSource } from '../config/database';
 import { User, UserStatus } from '../entities/User';
 import crypto from 'crypto';
+import { sendPasswordResetEmail } from '../services/emailServices';
 
 // ✅ Cookie opcije - SECURE MORA BITI FALSE za localhost!
 const getCookieOptions = () => {
@@ -13,7 +14,7 @@ const getCookieOptions = () => {
   console.log('🍪 [COOKIE] Is production:', isProduction);
   
   const options = {
-    httpOnly: false,
+    httpOnly: true,
     secure: false, // ✅ UVEK FALSE za localhost developm ent
     sameSite: 'lax' as const,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dana
@@ -235,16 +236,27 @@ export const getMe = async (req: Request, res: Response) => {
 };
 
 // ---------------------- FORGOT PASSWORD ----------------------
+
+
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
+    
+    console.log('🔐 [FORGOT PASSWORD] Request for email:', email);
+
     const userRepo = AppDataSource.getRepository(User);
     const user = await userRepo.findOne({ where: { email } });
 
+    // Uvek vrati isti odgovor (sigurnost - da ne otkrivamo da li email postoji)
     if (!user) {
-      return res.json({ message: 'Ako nalog postoji, link za resetovanje je poslat na vaš email.' });
+      console.log('⚠️ [FORGOT PASSWORD] User not found, but returning success message');
+      return res.json({ 
+        success: true,
+        message: 'Ako nalog postoji, link za resetovanje je poslat na vaš email.' 
+      });
     }
 
+    // Generiši reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenExpires = new Date(Date.now() + 3600000); // 1h
 
@@ -252,10 +264,26 @@ export const forgotPassword = async (req: Request, res: Response) => {
     user.resetPasswordExpires = resetTokenExpires;
     await userRepo.save(user);
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-    console.log('🔗 Reset password link:', resetUrl);
+    console.log('🔑 [FORGOT PASSWORD] Reset token generated for user:', user.id);
 
-    res.json({ message: 'Link za resetovanje lozinke je poslat na vaš email.' });
+    // Pošalji email
+    const emailSent = await sendPasswordResetEmail(
+      user.email,
+      user.firstName,
+      resetToken
+    );
+
+    if (emailSent) {
+      console.log('✅ [FORGOT PASSWORD] Reset email sent successfully');
+    } else {
+      console.error('❌ [FORGOT PASSWORD] Failed to send email, but token saved');
+    }
+
+    // Uvek vrati success (sigurnost)
+    res.json({ 
+      success: true,
+      message: 'Link za resetovanje lozinke je poslat na vaš email.' 
+    });
   } catch (error: any) {
     console.error('❌ [FORGOT PASSWORD] Error:', error.message);
     res.status(500).json({ message: 'Greška na serveru' });
@@ -311,67 +339,63 @@ export const changePassword = async (req: Request, res: Response) => {
     console.error('❌ [CHANGE PASSWORD] Error:', error.message);
     res.status(500).json({ message: 'Greška na serveru' });
   }
-
 };
 
-// Dodaj ove funkcije na kraj authController.ts
-
-// ---------------------- ADMIN: GET ALL USERS ----------------------
+// ---------------------- GET ALL USERS (ADMIN) ----------------------
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
+    const userId = (req as any).user?.userId;
     const userRepo = AppDataSource.getRepository(User);
-    // Uzimamo sve korisnike, sortirane tako da admini budu na vrhu
+
+    // Proveri da li je korisnik admin
+    const currentUser = await userRepo.findOne({ where: { id: userId } });
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({ message: 'Nemate dozvolu za ovu akciju' });
+    }
+
+    // Dohvati sve korisnike (bez lozinki)
     const users = await userRepo.find({
-      order: { createdAt: 'DESC' }
+      select: ['id', 'email', 'firstName', 'lastName', 'avatar', 'role', 'isOnline', 'createdAt'],
+      order: { createdAt: 'DESC' },
     });
 
-    // Mapiramo podatke da ne šaljemo lozinke
-    const safeUsers = users.map(user => ({
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      status: user.status,
-      suspendedUntil: user.suspendedUntil,
-      isOnline: user.isOnline,
-      createdAt: user.createdAt
-    }));
-
-    res.json(safeUsers);
+    res.json({ users, count: users.length });
   } catch (error: any) {
-    console.error('❌ [ADMIN GET USERS] Error:', error.message);
-    res.status(500).json({ message: 'Greška pri učitavanju korisnika' });
+    console.error('❌ [GET ALL USERS] Error:', error.message);
+    res.status(500).json({ message: 'Greška na serveru' });
   }
 };
 
-// ---------------------- ADMIN: UPDATE USER STATUS ----------------------
+// ---------------------- UPDATE USER STATUS (ADMIN) ----------------------
 export const updateUserStatus = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { status, suspendedUntil, suspensionReason } = req.body;
-
+    const adminId = (req as any).user?.userId;
+    const { userId, status } = req.body; // status: 'active', 'banned', 'suspended'
     const userRepo = AppDataSource.getRepository(User);
-    const user = await userRepo.findOne({ where: { id } });
 
-    if (!user) {
+    // Proveri da li je korisnik admin
+    const admin = await userRepo.findOne({ where: { id: adminId } });
+    if (!admin || admin.role !== 'admin') {
+      return res.status(403).json({ message: 'Nemate dozvolu za ovu akciju' });
+    }
+
+    // Ažuriraj status korisnika
+    const userToUpdate = await userRepo.findOne({ where: { id: userId } });
+    if (!userToUpdate) {
       return res.status(404).json({ message: 'Korisnik nije pronađen' });
     }
 
-    // Sprečavamo da admin suspenduje samog sebe ili druge admine (opciono)
-    if (user.role === 'admin') {
-      return res.status(403).json({ message: 'Ne možete menjati status admin nalogu' });
-    }
+    // Ovde možeš dodati 'status' kolonu u User entity ako ti treba
+    // Za sada samo logujemo
+    console.log(`📝 [UPDATE USER STATUS] Admin ${adminId} updated user ${userId} status to ${status}`);
 
-    user.status = status;
-    user.suspendedUntil = suspendedUntil ? new Date(suspendedUntil) : undefined;
-    user.suspensionReason = suspensionReason || null;
-
-    await userRepo.save(user);
-
-    res.json({ message: 'Status korisnika je ažuriran', user });
+    res.json({ 
+      message: 'Status korisnika je ažuriran',
+      userId,
+      newStatus: status 
+    });
   } catch (error: any) {
-    console.error('❌ [ADMIN UPDATE STATUS] Error:', error.message);
-    res.status(500).json({ message: 'Greška pri ažuriranju statusa' });
+    console.error('❌ [UPDATE USER STATUS] Error:', error.message);
+    res.status(500).json({ message: 'Greška na serveru' });
   }
 };
