@@ -227,6 +227,7 @@ export default function ReportsPage() {
                           lastName={report.reporter.lastName}
                           size="md"
                         />
+                        
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <p className="font-semibold text-dark-900">
