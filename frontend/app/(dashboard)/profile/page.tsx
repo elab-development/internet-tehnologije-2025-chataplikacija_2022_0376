@@ -11,6 +11,7 @@ import Card from 'components/ui/Card';
 import Modal from 'components/ui/Modal';
 import Navbar from 'components/layout/Navbar';
 import Sidebar from 'components/layout/Sidebar';
+import { AnalyticsChart } from 'components/AnalyticsChart';
 import Footer from 'components/layout/Footer';
 import { 
   User, 
@@ -286,7 +287,7 @@ export default function ProfilePage() {
                             <div>
                               <p className="text-xs text-dark-500">Uloga</p>
                               <p className="font-medium text-dark-900">
-                                {roleLabels[user.role]}
+                                {roleLabels[user.role as keyof typeof roleLabels]}
                               </p>
                             </div>
                           </div>
@@ -305,6 +306,13 @@ export default function ProfilePage() {
                     )}
                   </div>
                 </div>
+              </div>
+            </Card>
+
+            {/* IMPLEMENTACIJA VIZUALIZACIJE PODATAKA */}
+            <Card className="mb-6">
+              <div className="p-6">
+                <AnalyticsChart />
               </div>
             </Card>
 

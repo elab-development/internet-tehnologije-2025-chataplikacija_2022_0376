@@ -2,7 +2,7 @@ import request from 'supertest';
 import app from '../server';
 
 describe('API Testovi', () => {
-  // 1. UNIT TEST - Provera logike za validaciju (bez baze)
+  // 1. UNIT TEST - Provera logike za validaciju 
   describe('Unit Test: Validacija email-a', () => {
     it('Treba da prepozna neispravan email format', async () => {
       const res = await request(app)
