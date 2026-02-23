@@ -26,7 +26,6 @@ export default function ChatHeader({
 }: ChatHeaderProps) {
   const isGroup = conversation.type === 'group';
   
-  // Sagovornik je onaj koji nije trenutni korisnik
   const otherParticipant = conversation.participants.find(p => p.id !== currentUser.id);
   
   const displayName = isGroup
@@ -55,7 +54,7 @@ export default function ChatHeader({
               firstName={otherParticipant?.firstName}
               lastName={otherParticipant?.lastName}
               size="md"
-              online={otherParticipant?.isOnline}
+              online={false}
             />
           )}
 
@@ -67,9 +66,7 @@ export default function ChatHeader({
               "text-[11px] font-medium",
               !isGroup && otherParticipant?.isOnline ? "text-green-500" : "text-gray-400"
             )}>
-              {isGroup 
-                ? `${conversation.participants.length} učesnika` 
-                : otherParticipant?.isOnline ? 'Aktivan/na na mreži' : 'Van mreže'}
+              
             </p>
           </div>
         </div>

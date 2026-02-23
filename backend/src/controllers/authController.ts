@@ -116,6 +116,31 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Neispravan email ili lozinka' });
     }
 
+    // ✅ PROVERA STATUSA KORISNIKA - DODATO
+    if (user.status !== UserStatus.ACTIVE) {
+      console.log('❌ [LOGIN] User not active:', email, 'Status:', user.status);
+      
+      if (user.status === UserStatus.SUSPENDED) {
+        const suspendedMessage = user.suspendedUntil 
+          ? `Nalog je suspendovan do ${new Date(user.suspendedUntil).toLocaleDateString('sr-RS')}.`
+          : 'Nalog je suspendovan.';
+        
+        return res.status(403).json({ 
+          message: suspendedMessage,
+          reason: user.suspensionReason || 'Kontaktirajte administratora.',
+          status: user.status,
+          suspendedUntil: user.suspendedUntil
+        });
+      }
+      
+      if (user.status === UserStatus.BANNED) {
+        return res.status(403).json({ 
+          message: 'Nalog je trajno blokiran.',
+          status: user.status
+        });
+      }
+    }
+
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       console.log('❌ [LOGIN] Invalid password for:', email);
@@ -149,6 +174,7 @@ export const login = async (req: Request, res: Response) => {
       lastName: user.lastName,
       avatar: user.avatar,
       role: user.role,
+      status: user.status, 
       createdAt: user.createdAt,
     };
 
@@ -166,7 +192,6 @@ export const login = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Greška na serveru' });
   }
 };
-
 // ---------------------- LOGOUT ----------------------
 export const logout = async (req: Request, res: Response) => {
   try {

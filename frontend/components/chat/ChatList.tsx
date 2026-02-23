@@ -156,7 +156,7 @@ export default function ChatList({
                         firstName={otherParticipant?.firstName}
                         lastName={otherParticipant?.lastName}
                         size="lg"
-                        online={otherParticipant?.isOnline}
+                        online={false}
                       />
                     )}
                   </div>
