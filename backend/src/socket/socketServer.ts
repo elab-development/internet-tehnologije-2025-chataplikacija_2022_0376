@@ -20,7 +20,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
   });
 
   // Mapa za praćenje online korisnika
-  const onlineUsers = new Map<string, string>(); // userId -> socketId
+  const onlineUsers = new Map<string, string>(); 
 
   io.use(async (socket, next) => {
     try {

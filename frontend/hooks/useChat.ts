@@ -95,7 +95,6 @@ export function useChat(conversationId?: string) {
     if (!socket) return;
 
     const handleNewMessage = (message: Message) => {
-      // Backend šalje 'chatId', a tvoj tip možda ima 'conversationId'
       if (message.conversationId === conversationId) {
         setMessages((prev) => [...prev, message]);
       }

@@ -5,7 +5,6 @@ import { AppDataSource } from '../config/database';
 import { User, UserStatus } from '../entities/User';
 import crypto from 'crypto';
 
-// ✅ Cookie opcije - SECURE MORA BITI FALSE za localhost!
 const getCookieOptions = () => {
   const isProduction = process.env.NODE_ENV === 'production';
   
@@ -16,7 +15,7 @@ const getCookieOptions = () => {
     httpOnly: false,
     secure: false, // ✅ UVEK FALSE za localhost developm ent
     sameSite: 'lax' as const,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dana
+    maxAge: 7 * 24 * 60 * 60 * 1000, 
     path: '/',
   };
   
@@ -116,7 +115,6 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Neispravan email ili lozinka' });
     }
 
-    // ✅ PROVERA STATUSA KORISNIKA - DODATO
     if (user.status !== UserStatus.ACTIVE) {
       console.log('❌ [LOGIN] User not active:', email, 'Status:', user.status);
       
@@ -183,6 +181,7 @@ export const login = async (req: Request, res: Response) => {
     res.json({
       message: 'Uspešno ste se prijavili!',
       user: userData,
+      token: token,
     });
 
     console.log('📤 [LOGIN] Response sent, headers:', res.getHeaders());
@@ -339,7 +338,6 @@ export const changePassword = async (req: Request, res: Response) => {
 
 };
 
-// Dodaj ove funkcije na kraj authController.ts
 
 // ---------------------- ADMIN: GET ALL USERS ----------------------
 export const getAllUsers = async (req: Request, res: Response) => {
@@ -383,7 +381,6 @@ export const updateUserStatus = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Korisnik nije pronađen' });
     }
 
-    // Sprečavamo da admin suspenduje samog sebe ili druge admine (opciono)
     if (user.role === 'admin') {
       return res.status(403).json({ message: 'Ne možete menjati status admin nalogu' });
     }

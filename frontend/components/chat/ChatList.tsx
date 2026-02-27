@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Users, MessageCircle, Shield } from 'lucide-react';
+import { Search, Plus, Users, MessageCircle, Shield, CheckCheck } from 'lucide-react';
 import axios from '../../lib/axios';
 import { Conversation, Message, User } from '../../types/types';
 import Avatar from '../../components/ui/Avatar';
@@ -36,42 +36,43 @@ export default function ChatList({
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewMessageUpdateList = (message: Message) => {
+    const handleNewMessage = (message: Message) => {
       setConversations((prev) => {
-        const convId = message.conversationId || (message as any).conversationId;
-        const convIndex = prev.findIndex(c => c.id === convId);
+        const chatId = message.conversationId ;
+        const chatIndex = prev.findIndex(c => c.id === chatId);
         
-        if (convIndex === -1) {
-          fetchConversations();
-          return prev;
-        } 
+        if (chatIndex === -1) return prev;
 
-        const updatedConversations = [...prev];
-        const conversation = { ...updatedConversations[convIndex] };
-
-        conversation.lastMessage = message;
-        conversation.updatedAt = message.createdAt;
+        const updatedChats = [...prev];
+        const chat = { ...updatedChats[chatIndex] };
         
-        if (conversation.id !== selectedConversationId) {
-          conversation.unreadCount = (conversation.unreadCount || 0) + 1;
+        // Ažuriraj lastMessage
+        chat.lastMessage = message;
+        chat.updatedAt = message.createdAt;
+        
+        // Povećaj broj nepročitanih ako nije selektovan
+        if (chat.id !== selectedConversationId) {
+          chat.unreadCount = (chat.unreadCount || 0) + 1;
         }
 
-        updatedConversations.splice(convIndex, 1);
-        return [conversation, ...updatedConversations];
+        // Pomeri chat na vrh
+        updatedChats.splice(chatIndex, 1);
+        return [chat, ...updatedChats];
       });
     };
 
-    socket.on('message:new', handleNewMessageUpdateList);
+    socket.on('message:new', handleNewMessage);
     socket.on('chat:created', () => fetchConversations());
 
     return () => {
-      socket.off('message:new', handleNewMessageUpdateList);
+      socket.off('message:new', handleNewMessage);
       socket.off('chat:created');
     };
   }, [socket, selectedConversationId]);
 
   const fetchConversations = async () => {
     try {
+      setLoading(true);
       const response = await axios.get('/chats');
       setConversations(response.data);
     } catch (error) {
@@ -80,6 +81,36 @@ export default function ChatList({
       setLoading(false);
     }
   };
+
+  // 🔥 Funkcija za formatiranje poslednje poruke
+  const formatLastMessage = (conversation: Conversation): string => {
+    const lastMsg = conversation.lastMessage;
+    
+    if (!lastMsg) return 'Nova konverzacija';
+    
+
+    
+    // Ako je moja poruka, dodaj "Vi: "
+    const prefix = lastMsg.senderId === currentUser.id ? 'Vi: ' : '';
+    
+    // Formatiraj prema tipu poruke
+    switch (lastMsg.type) {
+      case 'image':
+        return prefix + '📷 Slika';
+      case 'gif':
+        return prefix + '🎬 GIF';
+      case 'file':
+        return prefix + '📎 Dokument';
+      case 'video':
+        return prefix + '🎥 Video';
+      default:
+        // Tekstualna poruka - skrati na 40 karaktera
+        const content = lastMsg.content || '';
+        return prefix + truncateText(content, 40);
+    }
+  };
+
+
 
   const filteredConversations = conversations.filter((conv) => {
     const searchLower = searchQuery.toLowerCase();
@@ -93,13 +124,21 @@ export default function ChatList({
 
   return (
     <div className="h-full flex flex-col bg-white">
+      {/* Header */}
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900 tracking-tight">Poruke</h2>
-          <Button variant="ghost" size="sm" onClick={onNewChat} className="rounded-full w-8 h-8 p-0 hover:bg-gray-100">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onNewChat} 
+            className="rounded-full w-8 h-8 p-0 hover:bg-gray-100"
+          >
             <Plus size={18} className="text-gray-600" />
           </Button>
         </div>
+        
+        {/* Pretraga */}
         <div className="relative">
           <Input
             placeholder="Pretraži razgovore..."
@@ -111,6 +150,7 @@ export default function ChatList({
         </div>
       </div>
 
+      {/* Lista čatova */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {loading ? (
           <div className="flex items-center justify-center h-32">
@@ -119,14 +159,17 @@ export default function ChatList({
         ) : filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 px-4 text-center">
             <MessageCircle size={32} className="mb-2 opacity-10" />
-            <p className="text-xs">Nema pronađenih čatova</p>
+            <p className="text-xs">
+              {searchQuery ? 'Nema rezultata pretrage' : 'Nema pronađenih čatova'}
+            </p>
           </div>
         ) : (
           <div className="flex flex-col">
             {filteredConversations.map((conversation) => {
               const isGroup = conversation.type === 'group';
               const otherParticipant = conversation.participants.find(p => p.id !== currentUser.id);
-              const isModerator = otherParticipant?.role?.toUpperCase() === 'MODERATOR' || otherParticipant?.role?.toUpperCase() === 'ADMIN';
+              const isModerator = otherParticipant?.role?.toUpperCase() === 'MODERATOR' || 
+                                  otherParticipant?.role?.toUpperCase() === 'ADMIN';
               
               const displayName = isGroup 
                 ? conversation.name 
@@ -134,20 +177,25 @@ export default function ChatList({
                   ? `${otherParticipant.firstName} ${otherParticipant.lastName}`
                   : 'Korisnik';
 
+              const lastMessageText = formatLastMessage(conversation);
+              const isUnread = conversation.unreadCount && conversation.unreadCount > 0;
+
               return (
                 <div
                   key={conversation.id}
                   onClick={() => onSelectConversation(conversation.id)}
                   className={cn(
-                    'flex items-center gap-3 p-4 cursor-pointer transition-all border-l-4 border-transparent',
+                    'flex items-center gap-3 p-4 cursor-pointer transition-all',
+                    'hover:bg-gray-50 border-l-4 border-transparent',
                     conversation.id === selectedConversationId 
-                      ? 'bg-blue-50/50 border-blue-600' 
-                      : 'hover:bg-gray-50'
+                      ? 'bg-blue-50/50 border-l-4 border-blue-600' 
+                      : ''
                   )}
                 >
+                  {/* Avatar */}
                   <div className="relative flex-shrink-0">
                     {isGroup ? (
-                      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center ring-2 ring-white">
+                      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
                         <Users size={22} className="text-blue-600" />
                       </div>
                     ) : (
@@ -161,37 +209,43 @@ export default function ChatList({
                     )}
                   </div>
 
+                  {/* Informacije o čatu */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
+                      {/* Ime i badge-evi */}
                       <div className="flex items-center gap-1.5 min-w-0">
                         <h3 className={cn(
                           "text-sm truncate",
-                          conversation.unreadCount || !conversation.lastMessage ? "font-bold text-gray-900" : "font-medium text-gray-700"
-                        )}>{displayName}</h3>
+                          isUnread ? "font-bold text-gray-900" : "font-medium text-gray-700"
+                        )}>
+                          {displayName}
+                        </h3>
                         {!isGroup && isModerator && (
                           <Shield size={12} className="text-blue-600 fill-blue-50 flex-shrink-0" />
                         )}
                       </div>
+
+                      {/* Vreme poslednje poruke */}
                       {conversation.lastMessage && (
-                        <span className="text-[10px] text-gray-400 font-medium">
+                        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap ml-2">
                           {formatMessageTime(conversation.lastMessage.createdAt)}
                         </span>
                       )}
                     </div>
+
+                    {/* Poslednja poruka i status */}
                     <div className="flex items-center justify-between">
-                      <p className={cn(
-                        "text-xs truncate pr-4 max-w-[180px]",
-                        conversation.unreadCount ? "text-blue-600 font-semibold" : "text-gray-500"
-                      )}>
-                        {conversation.lastMessage
-                          ? truncateText(conversation.lastMessage.content, 40)
-                          : 'Nova konverzacija'}
-                      </p>
-                      {conversation.unreadCount ? (
-                        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1.5 flex items-center justify-center shadow-sm">
-                          {conversation.unreadCount}
-                        </span>
-                      ) : null}
+                      <div className="flex items-center gap-1 min-w-0 flex-1">
+                        
+                        {/* Tekst poslednje poruke */}
+                        <p className={cn(
+                          "text-xs truncate",
+                          isUnread ? "text-blue-600 font-semibold" : "text-gray-500"
+                        )}>
+                          {lastMessageText}
+                        </p>
+                      </div>
+
                     </div>
                   </div>
                 </div>

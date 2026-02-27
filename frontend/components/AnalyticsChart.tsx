@@ -33,7 +33,6 @@ export const AnalyticsChart = () => {
   // ============ GENERISANJE PODATAKA ============
   const seed = user?.id?.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) || 12345;
   
-  // Generiši podatke po satima (0-23)
   const hourlyData: HourlyData[] = Array.from({ length: 24 }, (_, i) => {
 
     let baseValue = 0;
@@ -54,7 +53,6 @@ export const AnalyticsChart = () => {
     };
   });
 
-  // Generiši podatke po danima u nedelji
   const dailyData: DailyData[] = [
     { dan: 'Pon', poruke: 45 + (seed % 20) },
     { dan: 'Uto', poruke: 38 + (seed % 15) },
@@ -65,7 +63,6 @@ export const AnalyticsChart = () => {
     { dan: 'Ned', poruke: 73 + (seed % 28) }
   ];
 
-  // Izračunaj statistiku
   const stats: UserStats = {
     totalMessages: hourlyData.reduce((sum, h) => sum + h.poruke, 0),
     avgPerDay: Math.round(hourlyData.reduce((sum, h) => sum + h.poruke, 0) / 7),
@@ -80,7 +77,7 @@ export const AnalyticsChart = () => {
   // ============ RENDER ============
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 w-full">
-      {/* Header sa korisničkim info */}
+      {}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
           <h3 className="text-xl font-bold text-gray-900">
@@ -92,7 +89,7 @@ export const AnalyticsChart = () => {
           </p>
         </div>
         
-        {/* Toggle dugmad za tip grafikona */}
+        {}
         <div className="flex space-x-2 mt-3 sm:mt-0">
           <button
             onClick={() => setChartType('hourly')}

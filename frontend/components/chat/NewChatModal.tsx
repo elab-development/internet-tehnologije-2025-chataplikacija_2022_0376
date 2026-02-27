@@ -216,7 +216,7 @@ export default function NewChatModal({ isOpen, onClose, onChatCreated }: NewChat
                     firstName={user.firstName}
                     lastName={user.lastName}
                     size="md"
-                    online={user.isOnline}
+                    online={false}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 truncate">

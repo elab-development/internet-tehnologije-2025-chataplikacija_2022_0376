@@ -24,6 +24,13 @@ export default function ChatWindow({
   currentUser,
   onBack,
 }: ChatWindowProps) {
+  console.log('🎯 [ChatWindow] RENDER - Conversation:', conversationId);
+  console.log('🎯 [ChatWindow] Current user:', { 
+    id: currentUser.id, 
+    name: `${currentUser.firstName} ${currentUser.lastName}`,
+    email: currentUser.email
+  });
+
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,26 +47,64 @@ export default function ChatWindow({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { socket, connected } = useSocket();
 
+  // 🔥 PRATI PROMENU KORISNIKA I PONOVO UČITAJ PODATKE
   useEffect(() => {
-    fetchConversationData();
+    console.log('👤 [ChatWindow] currentUser PROMENJEN - PONOVNO UČITAVAM:', {
+      id: currentUser.id,
+      name: `${currentUser.firstName} ${currentUser.lastName}`,
+    });
+    
+    // Resetuj stanje
+    setMessages([]);
+    setConversation(null);
+    
+    // Ponovo učitaj podatke za ovog korisnika
+    if (conversationId) {
+      fetchConversationData();
+    }
+  }, [currentUser.id]); // 🔥 PRATI SAMO PROMENU ID-JA
+
+  useEffect(() => {
+    console.log('🔄 [ChatWindow] conversationId PROMENJEN:', conversationId);
+    if (conversationId) {
+      fetchConversationData();
+    }
   }, [conversationId]);
 
   useEffect(() => {
     if (!socket || !conversationId) return;
 
+    console.log('🔌 [ChatWindow] Povezivanje na socket za chat:', conversationId);
     socket.emit('join_chat', conversationId);
 
     const handleNewMessage = (message: any) => {
+      console.log('📩 [SOCKET] New message received:', {
+        messageId: message.id,
+        senderId: message.senderId,
+        currentUserId: currentUser.id,
+        isOwn: message.senderId === currentUser.id,
+        senderName: message.sender?.firstName,
+        content: message.content?.substring(0, 30),
+        type: message.type
+      });
+
       const msgChatId = message.conversationId || message.chatId;
       if (msgChatId === conversationId) {
         setMessages((prev) => {
-          if (prev.some((m) => m.id === message.id)) return prev;
+          if (prev.some((m) => m.id === message.id)) {
+            console.log('⚠️ [SOCKET] Duplicate message ignored:', message.id);
+            return prev;
+          }
+          console.log('✅ [SOCKET] Dodajem novu poruku u listu');
           return [...prev, message];
         });
+      } else {
+        console.log('⚠️ [SOCKET] Message za drugi chat:', msgChatId, 'trenutni:', conversationId);
       }
     };
 
     const handleMessageUpdated = (updatedMessage: any) => {
+      console.log('✏️ [SOCKET] Message updated:', updatedMessage.id);
       setMessages((prev) => 
         prev.map((msg) => (msg.id === updatedMessage.id ? updatedMessage : msg))
       );
@@ -67,6 +112,7 @@ export default function ChatWindow({
 
     const handleMessageDeleted = (data: any) => {
       const deletedId = typeof data === 'string' ? data : data.id;
+      console.log('🗑️ [SOCKET] Message deleted:', deletedId);
       setMessages((prev) => prev.filter((msg) => msg.id !== deletedId));
     };
 
@@ -76,13 +122,14 @@ export default function ChatWindow({
     socket.on('message:edited', handleMessageUpdated);
 
     return () => {
+      console.log('🔌 [ChatWindow] Napuštam socket za chat:', conversationId);
       socket.emit('leave_chat', conversationId);
       socket.off('message:new', handleNewMessage);
       socket.off('message:updated', handleMessageUpdated);
       socket.off('message:deleted', handleMessageDeleted);
       socket.off('message:edited', handleMessageUpdated);
     };
-  }, [socket, connected, conversationId]);
+  }, [socket, connected, conversationId, currentUser.id]); 
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -91,13 +138,23 @@ export default function ChatWindow({
   const fetchConversationData = async () => {
     try {
       setLoading(true);
+      console.log('📥 [ChatWindow] Učitavam podatke za chat:', conversationId, 'za korisnika:', currentUser.id);
+      
       const [convResponse, messagesResponse] = await Promise.all([
         axios.get(`/chats/${conversationId}`),
         axios.get(`/chats/${conversationId}/messages`),
       ]);
+      
+      console.log('📥 [ChatWindow] Učitano:', {
+        chat: convResponse.data.id,
+        messagesCount: messagesResponse.data.length,
+        zaKorisnika: currentUser.id
+      });
+      
       setConversation(convResponse.data);
       setMessages(messagesResponse.data);
     } catch (error: any) {
+      console.error('❌ [ChatWindow] Greška pri učitavanju:', error);
       toast.error('Greška pri učitavanju konverzacije');
     } finally {
       setLoading(false);
@@ -105,13 +162,27 @@ export default function ChatWindow({
   };
 
   const handleSendMessage = async (content: string, fileData?: any) => {
+    console.log('📤 [SEND MESSAGE] ===== NOVA PORUKA =====');
+    console.log('📤 [SEND MESSAGE] Current user:', { 
+      id: currentUser.id, 
+      name: `${currentUser.firstName} ${currentUser.lastName}`,
+      email: currentUser.email
+    });
+    console.log('📤 [SEND MESSAGE] Content:', content.substring(0, 50));
+    console.log('📤 [SEND MESSAGE] File:', fileData ? 'DA' : 'NE');
+    
     try {
       if (editingMessage) {
+        console.log('✏️ [SEND MESSAGE] Izmena poruke:', editingMessage.id);
         await axios.put(`/messages/${editingMessage.id}`, { content });
         setEditingMessage(null);
         toast.success('Poruka izmenjena');
       } else {
-        const payload: any = { chatId: conversationId, conversationId: conversationId };
+        const payload: any = { 
+          chatId: conversationId, 
+          conversationId: conversationId 
+        };
+        
         if (fileData) {
           payload.type = fileData.messageType;
           payload.content = content || `Poslao fajl: ${fileData.fileName}`;
@@ -119,13 +190,20 @@ export default function ChatWindow({
           payload.fileName = fileData.fileName;
           payload.fileSize = fileData.fileSize;
           payload.mimeType = fileData.mimeType;
+          console.log('📦 [SEND MESSAGE] File payload:', payload.type);
         } else {
           payload.type = 'text';
           payload.content = content;
         }
-        await axios.post('/messages', payload);
+        
+        console.log('📦 [SEND MESSAGE] Payload za slanje:', payload);
+        console.log('🚀 [SEND MESSAGE] Šaljem na API sa senderId:', currentUser.id);
+        
+        const response = await axios.post('/messages', payload);
+        console.log('✅ [SEND MESSAGE] Odgovor servera:', response.data);
       }
     } catch (error: any) {
+      console.error('❌ [SEND MESSAGE] Greška:', error.response?.data || error.message);
       toast.error(error.response?.data?.message || 'Greška pri slanju');
     }
   };
@@ -165,7 +243,7 @@ export default function ChatWindow({
       await axios.post('/reports', { 
         messageId: reportingMessageId, 
         reason: reportReason, 
-        additionalComment: reportComment // Popravljeno ime polja
+        additionalComment: reportComment
       });
       toast.success('Poruka je uspešno prijavljena');
       setReportModalOpen(false);
@@ -188,6 +266,7 @@ export default function ChatWindow({
   return (
     <div className="h-full flex flex-col bg-[#F0F2F5]">
       <ChatHeader conversation={conversation} currentUser={currentUser} onBack={onBack} onOpenInfo={() => setShowInfoModal(true)} />
+      
       <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-400 text-sm">Nema poruka. Recite "Zdravo!"</div>
@@ -195,9 +274,18 @@ export default function ChatWindow({
           messages.map((message, index) => {
             const isOwn = message.senderId === currentUser.id;
             const showAvatar = !isOwn && (!messages[index - 1] || messages[index - 1].senderId !== message.senderId);
+            
+            console.log('💬 [RENDER] Poruka:', {
+              id: message.id,
+              senderId: message.senderId,
+              currentUserId: currentUser.id,
+              isOwn: isOwn,
+              content: message.content?.substring(0, 20)
+            });
+            
             return (
               <MessageBubble 
-                key={message.id} 
+                key={`${message.id}-${currentUser.id}`} // 🔥 DODAT user.id U KEY
                 message={message} 
                 isOwn={isOwn} 
                 showAvatar={showAvatar} 
@@ -219,7 +307,11 @@ export default function ChatWindow({
         <div ref={messagesEndRef} />
       </div>
 
-      <MessageInput onSendMessage={handleSendMessage} editingMessage={editingMessage} onCancelEdit={() => setEditingMessage(null)} />
+      <MessageInput 
+        onSendMessage={handleSendMessage} 
+        editingMessage={editingMessage} 
+        onCancelEdit={() => setEditingMessage(null)} 
+      />
 
       <Modal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} title="Detalji grupe">
         <div className="p-2 space-y-6">

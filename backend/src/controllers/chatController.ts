@@ -4,19 +4,86 @@ import { AppDataSource } from '../config/database';
 import { Chat, ChatType } from '../entities/Chat';
 import { ChatMembership, MemberRole } from '../entities/ChatMembership';
 import { User } from '../entities/User';
+import { Message } from '../entities/Message';
 
-// Fja koja ubacuje ulogu
 const formatChatResponse = (chat: any) => {
   if (!chat) return null;
+  
+  // Eksplicitno formatiraj poruke da uključe kompletnog sender-a
+  const formattedMessages = chat.messages?.map((message: any) => {
+    // Ako message već ima sender objekat, koristi ga
+    if (message.sender) {
+      return {
+        ...message,
+        sender: {
+          id: message.sender.id,
+          email: message.sender.email,
+          firstName: message.sender.firstName,
+          lastName: message.sender.lastName,
+          avatar: message.sender.avatar,
+          role: message.sender.role
+        }
+      };
+    }
+    
+    // Ako nema sender objekat, probaj da ga nađeš među učesnicima
+    const senderFromParticipants = chat.memberships?.find(
+      (m: any) => m.user?.id === message.senderId
+    )?.user;
+    
+    return {
+      ...message,
+      sender: senderFromParticipants ? {
+        id: senderFromParticipants.id,
+        email: senderFromParticipants.email,
+        firstName: senderFromParticipants.firstName,
+        lastName: senderFromParticipants.lastName,
+        avatar: senderFromParticipants.avatar,
+        role: senderFromParticipants.role
+      } : {
+        id: message.senderId,
+        firstName: 'Nepoznati',
+        lastName: 'Korisnik',
+        email: ''
+      }
+    };
+  }) || [];
+  
+  // Poslednja poruka za prikaz u listi
+  const lastMessage = formattedMessages.length > 0 
+    ? formattedMessages[formattedMessages.length - 1] 
+    : null;
+  
   return {
-    ...chat,
+    id: chat.id,
+    type: chat.type,
+    name: chat.name,
+    description: chat.description,
+    createdAt: chat.createdAt,
+    updatedAt: chat.updatedAt,
     participants: chat.memberships 
       ? chat.memberships.map((m: any) => ({
-          ...m.user,      
-          chatRole: m.role 
-        })) 
+          id: m.user.id,
+          email: m.user.email,
+          firstName: m.user.firstName,
+          lastName: m.user.lastName,
+          avatar: m.user.avatar,
+          role: m.user.role,
+          isOnline: m.user.isOnline,
+          lastSeen: m.user.lastSeen,
+          chatRole: m.role,
+          joinedAt: m.joinedAt
+        })).sort((a: any, b: any) => {
+          if (a.chatRole === 'admin') return -1;
+          if (b.chatRole === 'admin') return 1;
+          if (a.chatRole === 'moderator') return -1;
+          if (b.chatRole === 'moderator') return 1;
+          return 0;
+        })
       : [],
-    messages: chat.messages || []
+    messages: formattedMessages,
+    lastMessage: lastMessage,
+    unreadCount: 0 
   };
 };
 
@@ -27,6 +94,7 @@ export const createPrivateChat = async (req: AuthRequest, res: Response) => {
     const chatRepository = AppDataSource.getRepository(Chat);
     const membershipRepository = AppDataSource.getRepository(ChatMembership);
 
+    // Proveri da li već postoji privatni chat između ova dva korisnika
     const existingMemberships = await membershipRepository
       .createQueryBuilder('membership')
       .innerJoin('membership.chat', 'chat')
@@ -48,10 +116,12 @@ export const createPrivateChat = async (req: AuthRequest, res: Response) => {
       const existingChat = await chatRepository.findOne({
         where: { id: existingChatId },
         relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
+        order: { messages: { createdAt: 'ASC' } }
       });
       return res.json(formatChatResponse(existingChat));
     }
 
+    // Kreiraj novi chat
     const chat = chatRepository.create({ type: ChatType.PRIVATE });
     await chatRepository.save(chat);
 
@@ -72,6 +142,7 @@ export const createPrivateChat = async (req: AuthRequest, res: Response) => {
     const createdChat = await chatRepository.findOne({
       where: { id: chat.id },
       relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
+      order: { messages: { createdAt: 'ASC' } }
     });
 
     return res.status(201).json(formatChatResponse(createdChat));
@@ -116,6 +187,7 @@ export const createGroupChat = async (req: AuthRequest, res: Response) => {
     const createdChat = await chatRepository.findOne({
       where: { id: chat.id },
       relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
+      order: { messages: { createdAt: 'ASC' } }
     });
 
     return res.status(201).json(formatChatResponse(createdChat));
@@ -155,6 +227,7 @@ export const getChatById = async (req: AuthRequest, res: Response) => {
     const chat = await chatRepository.findOne({
       where: { id },
       relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
+      order: { messages: { createdAt: 'ASC' } }
     });
 
     if (!chat) {
@@ -170,7 +243,7 @@ export const getChatById = async (req: AuthRequest, res: Response) => {
 
 export const addMemberToGroup = async (req: AuthRequest, res: Response) => {
   try {
-    const { chatId, email } = req.body; // Korisnika tražimo po emailu
+    const { chatId, email } = req.body;
     const currentUserId = req.user!.id;
 
     const membershipRepository = AppDataSource.getRepository(ChatMembership);
@@ -209,6 +282,7 @@ export const addMemberToGroup = async (req: AuthRequest, res: Response) => {
     const updatedChat = await chatRepository.findOne({
       where: { id: chatId },
       relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
+      order: { messages: { createdAt: 'ASC' } }
     });
 
     return res.json(formatChatResponse(updatedChat));
@@ -218,14 +292,13 @@ export const addMemberToGroup = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// --- FUNKCIJA: Izbacivanje člana ---
 export const removeMemberFromGroup = async (req: AuthRequest, res: Response) => {
   try {
-    const { chatId, userId } = req.body; // userId onoga koga izbacujemo
+    const { chatId, userId } = req.body;
     const currentUserId = req.user!.id;
     const membershipRepository = AppDataSource.getRepository(ChatMembership);
+    const chatRepository = AppDataSource.getRepository(Chat);
     
-    // 1. Provera: Ko si ti?
     const currentUserMembership = await membershipRepository.findOne({
       where: { chatId, userId: currentUserId },
     });
@@ -238,12 +311,43 @@ export const removeMemberFromGroup = async (req: AuthRequest, res: Response) => 
       return res.status(403).json({ message: 'Nemate dozvolu za izbacivanje.' });
     }
 
-    // 2. Obriši membership onoga koga izbacujemo
     await membershipRepository.delete({ chatId, userId });
     
-    return res.json({ message: 'Member removed successfully' });
+    const updatedChat = await chatRepository.findOne({
+      where: { id: chatId },
+      relations: ['memberships', 'memberships.user', 'messages', 'messages.sender'],
+      order: { messages: { createdAt: 'ASC' } }
+    });
+
+    return res.json(formatChatResponse(updatedChat));
   } catch (error) {
     console.error('Remove member error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Dodatna funkcija za brisanje chata (samo admin)
+export const deleteChat = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    
+    const chatRepository = AppDataSource.getRepository(Chat);
+    const membershipRepository = AppDataSource.getRepository(ChatMembership);
+    
+    const membership = await membershipRepository.findOne({
+      where: { chatId: id, userId }
+    });
+    
+    if (!membership || (membership.role !== MemberRole.ADMIN)) {
+      return res.status(403).json({ message: 'Samo admin može obrisati chat' });
+    }
+    
+    await chatRepository.delete(id);
+    
+    return res.json({ message: 'Chat uspešno obrisan' });
+  } catch (error) {
+    console.error('Delete chat error:', error);
     return res.status(500).json({ message: 'Server error' });
   }
 };

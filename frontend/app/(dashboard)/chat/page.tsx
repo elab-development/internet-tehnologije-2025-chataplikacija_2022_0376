@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import ChatList from '../../../components/chat/ChatList';
 import ChatWindow from '../../../components/chat/ChatWindow';
@@ -12,6 +12,15 @@ export default function ChatPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [showChatOnMobile, setShowChatOnMobile] = useState(false);
+  const [componentKey, setComponentKey] = useState(0); // 🔥 Dodato za forsiranje renderovanja
+
+  // 🔥 Prati promenu user-a i forsiraj renderovanje
+  useEffect(() => {
+    if (user) {
+      console.log('👤 ChatPage: user promenjen na:', user.id, user.firstName, user.lastName);
+      setComponentKey(prev => prev + 1); // Forsiraj ponovno renderovanje
+    }
+  }, [user?.id]); // Prati samo promenu ID-a
 
   const handleSelectConversation = (conversationId: string) => {
     setSelectedConversationId(conversationId);
@@ -34,8 +43,10 @@ export default function ChatPage() {
 
   if (!user) return null;
 
+  console.log('🎯 ChatPage render - current user:', user.id, user.firstName, user.lastName);
+
   return (
-    <div className="flex h-full w-full overflow-hidden bg-white">
+    <div key={componentKey} className="flex h-full w-full overflow-hidden bg-white"> {/* 🔥 Dodat key */}
       {/* SIDEBAR - Lista konverzacija */}
       <aside
         className={`${
@@ -69,6 +80,7 @@ export default function ChatPage() {
       >
         {selectedConversationId ? (
           <ChatWindow
+            key={`${selectedConversationId}-${user.id}`} // 🔥 Dodat key sa user ID
             conversationId={selectedConversationId}
             currentUser={user}
             onBack={() => {

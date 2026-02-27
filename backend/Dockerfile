@@ -15,8 +15,6 @@ COPY . .
 # Build TypeScript koda
 RUN npm run build
 
-# Ovdje možeš dodati komandu da obrišeš devDependencies ako želiš uštedu prostora, 
-# ali za sada je bitno da proradi.
 
 # Eksponiranje porta
 EXPOSE 5000

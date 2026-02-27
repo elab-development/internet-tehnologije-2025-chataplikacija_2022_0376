@@ -140,7 +140,7 @@ const swaggerOptions: swaggerJsDoc.Options = {
       }
     }
   },
-  apis: [], // Isključeno čitanje iz komentara da bi izbegli YAML greške
+  apis: [],
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
